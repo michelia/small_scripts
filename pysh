@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+#encoding=utf8
+from __future__ import division
+import sys,  pdb, argparse, time, datetime
+from path import path
+b = pdb.set_trace   #调试
+from commands import getstatusoutput
+from sendMail import send_mail
+
+def main():
+    function = ''
+    parser = argparse.ArgumentParser(description=function)
+    parser.add_argument("sh_script_fp",
+                        help="shell脚本文件")
+    parser.add_argument("--mail", action='store_true',
+                        help="发送邮件")
+    args = parser.parse_args()
+    # print args
+    if path(args.sh_script_fp).isfile():
+        sc_file_filter(args.sh_script_fp, args.mail)
+    else:
+        cmd_exec(args.sh_script_fp, args.mail)
+
+def sc_file_filter(sh_script_fp, mail=False):
+    for line in open(sh_script_fp):
+        if line.startswith('#'):
+            print line
+        else:
+            cmd = line[:-1]
+            if cmd: # 去掉空行
+                cmd_exec(cmd, mail)
+
+def cmd_exec(cmd, mail=False):
+    print
+    print 'CMD:', cmd, '\n     ...'
+    status, output = getstatusoutput(cmd)
+    print output
+    if status is not 0:
+        error = '[Error CMD:] %s' % cmd
+        print error
+        if mail:
+            send_mail(sub='cmd error', content=error)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    startTime = datetime.datetime.now()
+    main()
+    # print
+    print '[INFO] Success!    Used time: %s' % (datetime.datetime.now()-startTime)
+    print
+
+
+

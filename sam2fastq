@@ -1,0 +1,30 @@
+#!/usr/bin/env python
+#encoding=utf8
+from __future__ import division
+import argparse, time, pysam
+# import sys,  pdb, argparse, time
+# b = pdb.set_trace   #调试
+from path import path
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+def main():
+    function = '把sam/bam文件转换为fastq文件'
+    parse = argparse.ArgumentParser(#prog='qiime_pipline', 
+        description=function)
+    parse.add_argument('samFile')
+    parse.add_argument('toDir')
+    # parse.add_argument('toFormat')
+    args = parse.parse_args()
+    toFile = '%s/%s.fastq' % (args.toDir, path(args.samFile).namebase)
+    samfile = pysam.Samfile(args.samFile)
+    output = open(toFile, 'w')
+    for aread in samfile:
+        title = aread.qname
+        seq = aread.seq
+        qual = aread.qual
+        line_fmt = "@{0!s}\n{1!s}\n+{0!s}\n{2!s}\n"
+        line = line_fmt.format(title, seq, qual)
+        output.write(line)
+    output.close()
+main()
