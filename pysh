@@ -26,7 +26,7 @@ def sc_file_filter(sh_script_fp, mail=False):
         if line.startswith('#'):
             print line
         else:
-            cmd = line[:-1]
+            cmd = line.strip()
             if cmd: # 去掉空行
                 cmd_exec(cmd, mail)
 

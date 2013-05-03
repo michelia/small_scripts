@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+#encoding=utf8
+from __future__ import division
+import argparse, time, sys
+from Bio import SeqIO
+from path import path
+import textwrap
+
+def main():
+    function = 'biomi is a python program in bioinformatics.'
+    parser = argparse.ArgumentParser(description=function,)
+    subparsers = parser.add_subparsers(title='subcommands',help='sub-command help',
+        description='Choose a command to perform the corresponding operation.')
+
+    fconvertParse = subparsers.add_parser('fconvert', help="covert sequence data format", 
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            covert sequence data format. 
+                E.g: biomi fconvert file.sff sff ./ fastq,fasta,qual
+            '''))
+    fconvertParse.add_argument('fromFile')
+    fconvertParse.add_argument('fromFormat')
+    fconvertParse.add_argument('toDir')
+    fconvertParse.add_argument('toFormat')
+    fconvertParse.set_defaults(func=fconvert)
+
+    if len(sys.argv)==1:
+        parser.parse_args(['-h'])
+    args = parser.parse_args()
+    args.func(args)
+
+def fconvert(args):
+    if not path(args.toDir).exists():
+        path(args.toDir).mkdir()
+    for toFormat in args.toFormat.split(','):
+        toFile = '%s/%s.%s' % (args.toDir, path(args.fromFile).namebase, toFormat)
+        count = SeqIO.convert(args.fromFile, args.fromFormat, toFile, toFormat)
+        print "Converted %i records from %s to %s" % (count, args.fromFormat, toFormat)  #统计转换序列的个数。
+
+if __name__ == '__main__':
+    print 
+    main()
+    print 
