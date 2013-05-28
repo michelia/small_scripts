@@ -89,7 +89,13 @@ def matrix2csv(biom, matrix, toFile):
     head.append('sum')
     table.append(head)
     for i, row_value in enumerate(matrix):
-        table.append([biom['rows'][i]['id']]+row_value.tolist()+[sum(row_value.tolist())])
+        line = []
+        line.append(biom['rows'][i]['id'])
+        line.extend(row_value.tolist())
+        line.append(sum(row_value.tolist()))
+        line.append(';'.join(biom['rows'][i]['metadata']['taxonomy']))
+        # table.append([biom['rows'][i]['id']]+row_value.tolist()+[sum(row_value.tolist())]+[';'.join(biom['rows'][i]['metadata']['taxonomy'])])
+        table.append(line)
 
     from michelia import CsvWriter
     tabfile = CsvWriter(toFile)
