@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #encoding=utf8
 # from __future__ import division
-import argparse , sys, textwrap
+import argparse , sys, textwrap, datetime
 
-from biomi_lib import fconvert, sam2fastq, cutseq, checkQual
+from biomi_lib import fconvert, cutseq, checkQual #, sam2fastq
 
 def main():
     function = 'biomi is a python program in bioinformatics.'
@@ -24,16 +24,16 @@ def main():
     fconvertParse.add_argument('--gz', action='store_true', help='输入输出都是gz压缩后的的文件。')
     fconvertParse.set_defaults(func=fconvert)
 
-    sam2fastqParse = subparsers.add_parser('sam2fastq', help="covert sam/bam to fastq",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent('''
-            covert sam/bam to fastq
-                E.g: biomi sam2fastq file.sam ./
-                     biomi sam2fastq file.bam ./
-            '''))
-    sam2fastqParse.add_argument('samFile',help='sam or bam file')
-    sam2fastqParse.add_argument('toDir', help='save fastq to the Dir')
-    sam2fastqParse.set_defaults(func=sam2fastq)
+    # sam2fastqParse = subparsers.add_parser('sam2fastq', help="covert sam/bam to fastq",
+    #     formatter_class=argparse.RawDescriptionHelpFormatter,
+    #     description=textwrap.dedent('''
+    #         covert sam/bam to fastq
+    #             E.g: biomi sam2fastq file.sam ./
+    #                  biomi sam2fastq file.bam ./
+    #         '''))
+    # sam2fastqParse.add_argument('samFile',help='sam or bam file')
+    # sam2fastqParse.add_argument('toDir', help='save fastq to the Dir')
+    # sam2fastqParse.set_defaults(func=sam2fastq)
 
     cutseqParse = subparsers.add_parser('cutseq', help="按设定的长度截取seq",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -48,7 +48,7 @@ def main():
     cutseqParse.add_argument('-f', type=int, default=1, help='First base to keep. Default is 1 (=first base).')
     cutseqParse.add_argument('-l', type=int, help='Last base to keep. Default is entire read.\
             如当 -l 150 时， 有的序列长度达到150, 则原样输出，只截取 大于150的read 到 150')
-    cutseqParse.add_argument('--gz', action='store_true', help='输入输出都是gz压缩后的的文件。')
+    # cutseqParse.add_argument('--gz', action='store_true', help='输入输出都是gz压缩后的的文件。')
     cutseqParse.set_defaults(func=cutseq)
 
     checkQualParse = subparsers.add_parser('checkQual', help="识别fastq文件的质量值编码(encode offset)",
@@ -67,6 +67,9 @@ def main():
 
 
 if __name__ == '__main__':
+    startTime = datetime.datetime.now()
     print
     main()
+    print
+    print '[INFO] Success!    Used time: %s' % (datetime.datetime.now()-startTime)
     print

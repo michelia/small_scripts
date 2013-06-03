@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+#encoding=utf8
+'''
+依赖的python包： biopython, path.py
+'''
+from __future__ import division
+import argparse, sys, textwrap
+from Bio import SeqIO
+from path import path
+import pdb
+from itertools import imap
+b = pdb.set_trace
+
+
+def cut_sff(args):
+    sff_records = SeqIO.parse(args.sff, 'sff')
+    outfile = '%s/%s_cut_%s.fastq' % (args.outDir, path(args.sff).namebase, args.num)
+    out = open(outfile, 'wb')
+    SeqIO.write(imap(lambda x: cut_record(x, args.num), sff_records), out, 'fastq')
+    # SeqIO.write(imap(lambda x: cut_record(x, args.num), sff_records), out, 'sff')
+    print 'Success!!!'
+
+def cut_record(record, cut_flag):
+    flow_index = record.annotations['flow_index']
+    flow_values = record.annotations['flow_values']
+    i_sum = 0
+    for i,v in enumerate(flow_index):
+        i_sum += v
+        if i_sum > cut_flag:
+            break
+    new_record = record[:i]
+    new_record.annotations = record.annotations
+    new_record.annotations['flow_values'] = record.annotations['flow_values'][:cut_flag]
+    new_record.annotations['flow_chars'] = record.annotations['flow_chars'][:cut_flag]
+    new_record.annotations['flow_index'] = record.annotations['flow_index'][:i]
+
+    return new_record
+def sff2txt(args):
+    out = '%s/%s_sff.txt' % (args.outDir, path(args.sff).namebase)
+    if path(out).exists():
+        path(out).remove()
+    out_handle = open(out, 'w')
+    for record in SeqIO.parse(args.sff, 'sff'):
+        out_handle.write('%s\n' % record)
+        out_handle.write('Seq: %s\n' % record.seq)
+        out_handle.write('Seq Qual: %s\n\n' % record.letter_annotations['phred_quality'])
+    out_handle.close()
+    print 'Success!!!'
+
+def main():
+    function = '模块的说明'
+    parser = argparse.ArgumentParser(description=function,)
+    subparsers = parser.add_subparsers(title='subcommands',help='sub-command help',
+        description='Choose a command to perform the corresponding operation.')
+
+    cut_sff2fastqParse = subparsers.add_parser('cut_sff2fastq', help="cut 到指定的位置, 并把输出为fastq格式",
+                                                                    #  (如为5就cut到5这个位置)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            Use example
+                E.g: deal_sff.py cut_sff2fastq example.sff 50 ./
+            '''))
+    cut_sff2fastqParse.add_argument('sff', help='the sff file path')
+    cut_sff2fastqParse.add_argument('num', help='the number of cut to', type=int)
+    cut_sff2fastqParse.add_argument('outDir', help='save result to this dir.')
+    cut_sff2fastqParse.set_defaults(func=cut_sff)
+    sff2txtParse = subparsers.add_parser('sff2txt', help="把sff转换成可查阅的txt格式",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            Use example
+                E.g: deal_sff.py sff2txt example.sff  ./
+            '''))
+    sff2txtParse.add_argument('sff', help='the sff file path')
+    sff2txtParse.add_argument('outDir', help='save result to this dir.')
+    sff2txtParse.set_defaults(func=sff2txt)
+
+    if len(sys.argv)==1:
+        parser.parse_args(['-h'])
+    args = parser.parse_args()
+    args.func(args)
+
+if __name__ == '__main__':
+    print
+    main()
+    print

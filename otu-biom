@@ -16,14 +16,14 @@ def main():
     statParse.add_argument('biomfp', help='biom file')
     statParse.set_defaults(func=stat)
 
-    tocsvParse = subparsers.add_parser('tocsv', 
+    tocsvParse = subparsers.add_parser('tocsv',
                             help='get data of biom to csv')
     tocsvParse.add_argument('biomfp', help='biom file')
     tocsvParse.add_argument('toDir', help='save the matrix of biom as csv to Dir')
     tocsvParse.set_defaults(func=tocsv)
 
 
-    trimParse = subparsers.add_parser('trim', 
+    trimParse = subparsers.add_parser('trim',
                         help="del sample's OTU that read number less than critical")
     trimParse.add_argument('biomfp', help='biom file')
     trimParse.add_argument('critical', help="when less than this critiacal, del the OTU'number",
@@ -38,7 +38,7 @@ def main():
 
 def stat(args):
     biom, matrix = biom_matrix(args.biomfp)
-    print 
+    print
     print 'Tatal OTU: ', len(biom['rows'])
     print 'Sample OTU stat:'
     for col in range(biom['shape'][1]):
@@ -47,17 +47,17 @@ def stat(args):
             if value > 0:
                 count += 1
         print '%s\t%s' % (biom['columns'][col]['id'], count)
-    print 
+    print
 
 def trim(args):
     biom, matrix = biom_matrix(args.biomfp)
     if not path(args.toDir).exists():
         path(args.toDir).mkdir()
     toFileBiom = '%s/%s_trim_%s.biom' % (args.toDir, path(args.biomfp).namebase, args.critical)
-    toFileCsv = '%s/%s_trim_%s.csv' % (args.toDir, path(args.biomfp).namebase,  args.critical)
+    toFiletsv = '%s/%s_trim_%s.csv' % (args.toDir, path(args.biomfp).namebase,  args.critical)
     biom, matrix = biom_modify(biom, matrix, critical=args.critical)
     biom2file(biom, toFileBiom)
-    matrix2csv(biom, matrix, toFileCsv)
+    matrix2csv(biom, matrix, toFiletsv)
 
 
 
@@ -97,8 +97,8 @@ def matrix2csv(biom, matrix, toFile):
         # table.append([biom['rows'][i]['id']]+row_value.tolist()+[sum(row_value.tolist())]+[';'.join(biom['rows'][i]['metadata']['taxonomy'])])
         table.append(line)
 
-    from michelia import CsvWriter
-    tabfile = CsvWriter(toFile)
+    from michelia import tsvWriter
+    tabfile = tsvWriter(toFile)
     for row in table:
         tabfile.writerow(row)
     tabfile.close()
@@ -140,7 +140,7 @@ def biom_modify(biom, matrix, critical=5):
         del mList[r]
         del biom['rows'][r]
     # T 的意思是反转 matrix, 这里要删除的是列，所以要先反转再删除
-    mList = np.array(mList).T.tolist() 
+    mList = np.array(mList).T.tolist()
     for c in colDel:
         del mList[c]
         del biom['columns'][c]

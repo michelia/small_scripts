@@ -4,7 +4,7 @@ from __future__ import division
 import argparse, sys, textwrap, pysam
 from Bio import SeqIO
 from path import path
-from michelia import CsvReader
+from michelia import tsvReader
 import pdb
 b = pdb.set_trace
 def main():
@@ -32,7 +32,7 @@ def main():
 def sample_stat(args):
     sampleList = [] # (sampleID, barcode)
     barcodeCount = {} # {barcode: count}
-    for sample in CsvReader(args.mapping, 1):
+    for sample in tsvReader(args.mapping, 1):
         sampleList.append((sample[0], sample[1]))
         barcodeCount[sample[1]] = 0
     barLen = len(sample[1])
