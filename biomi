@@ -51,7 +51,7 @@ def main():
     # cutseqParse.add_argument('--gz', action='store_true', help='输入输出都是gz压缩后的的文件。')
     cutseqParse.set_defaults(func=cutseq)
 
-    checkQualParse = subparsers.add_parser('checkQual', help="识别fastq文件的质量值编码(encode offset)",
+    checkQualParse = subparsers.add_parser('checkqual', help="识别fastq文件的质量值编码(encode offset)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''
             covert sequence data format.
@@ -60,8 +60,8 @@ def main():
     checkQualParse.add_argument('fastq', help='fastq文件或者是gz压缩的fastq文件')
     checkQualParse.set_defaults(func=checkQual)
 
-    if len(sys.argv)==1:
-        parser.parse_args(['-h'])
+    # if len(sys.argv)==1:
+    #     parser.parse_args(['-h'])
     args = parser.parse_args()
     args.func(args)
 
