@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #encoding=utf8
 import argparse, time , sys
-from otu_biom_lib import stat, tocsv, trim, del_repeat
+from otu_biom_lib import stat, totsv, trim, del_repeat
 
 def main():
     function = 'biom文件的处理'
@@ -13,11 +13,11 @@ def main():
     statParse.add_argument('biomfp', help='biom file')
     statParse.set_defaults(func=stat)
 
-    tocsvParse = subparsers.add_parser('tocsv',
+    totsvParse = subparsers.add_parser('totsv',
                             help='get data of biom to csv')
-    tocsvParse.add_argument('biomfp', help='biom file')
-    tocsvParse.add_argument('toDir', help='save the matrix of biom as csv to Dir')
-    tocsvParse.set_defaults(func=tocsv)
+    totsvParse.add_argument('biomfp', help='biom file')
+    totsvParse.add_argument('toDir', help='save the matrix of biom as csv to Dir')
+    totsvParse.set_defaults(func=totsv)
 
 
     trimParse = subparsers.add_parser('trim',
@@ -37,8 +37,8 @@ def main():
 
     # if len(sys.argv)==1:
     #     parser.parse_args(['-h'])
-    # args = parser.parse_args()
-    # args.func(args)
+    args = parser.parse_args()
+    args.func(args)
 
 if __name__ == '__main__':
     main()

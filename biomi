@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #encoding=utf8
-# from __future__ import division
+
 import argparse , sys, textwrap, datetime
 
-from biomi_lib import fconvert, cutseq, checkQual #, sam2fastq
+from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert #, sam2fastq
 
 def main():
     function = 'biomi is a python program in bioinformatics.'
@@ -11,6 +11,7 @@ def main():
     subparsers = parser.add_subparsers(title='subcommands',help='sub-command help',
         description='Choose a command to perform the corresponding operation.')
 
+# 下面是各个自程序
     fconvertParse = subparsers.add_parser('fconvert', help="covert sequence data format",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''
@@ -58,7 +59,17 @@ def main():
                 E.g: biomi checkQual example.fastq / example.fastq.gz
             '''))
     checkQualParse.add_argument('fastq', help='fastq文件或者是gz压缩的fastq文件')
+
     checkQualParse.set_defaults(func=checkQual)
+    fq_id_convertParse = subparsers.add_parser('fq_id_convert', help='把格式2类型id转换成格式1型, 因为格式1常用',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            把格式2类型id转换成格式1型, E.
+                因为格式1常用.g: biomi fq_id_convert example.fastq tosave.fastq
+            '''))
+    fq_id_convertParse.add_argument('infq', help='输入的fastq文件')
+    fq_id_convertParse.add_argument('outfq', help='save out to outfq')
+    fq_id_convertParse.set_defaults(func=fq_id_convert)
 
     # if len(sys.argv)==1:
     #     parser.parse_args(['-h'])
