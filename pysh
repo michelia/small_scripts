@@ -5,31 +5,33 @@ import sys,  pdb, argparse, time, datetime
 from path import path
 b = pdb.set_trace   #调试
 from commands import getstatusoutput
-from michelia import send_mail, multipros
+from michelia import send_mail, multipros, cond
 
 
 def main():
     function = ''
     parser = argparse.ArgumentParser(description=function)
-    parser.add_argument("sh_script_fp",
-                        help="shell脚本文件")
+    parser.add_argument("sh_script",
+                        help="shell脚本文件或命令如 'll ./dir'")
     parser.add_argument("--mail", action='store_true',
                         help="发送邮件")
     parser.add_argument('--multi', action='store_true',
                         help='同时执行一个sh文件的所有命令, 即多进程')
     args = parser.parse_args()
     # print args
-    if path(args.sh_script_fp).isfile():
-        sc_file_filter(args.sh_script_fp, args.mail, args.multi)
+    if path(args.sh_script).isfile():
+        sc_file_filter(args.sh_script, args.mail, args.multi)
     else:
-        cmd_exec(args.sh_script_fp, args.mail)
+        cmd_exec(args.sh_script)
+        if args.mail:
+            send_mail(sub='cmd Success', content=args.sh_script)
 
-def sc_file_filter(sh_script_fp, mail=False, multi=False):
+def sc_file_filter(sh_script, mail=False, multi=False):
     '''
     扩展这个函数实现多进程, 最简单的多进程 不要通信的
     '''
     pros = []
-    for line in open(sh_script_fp):
+    for line in open(sh_script):
         cmd = line.strip()
         if not cmd:
             continue # 去掉空行
@@ -37,7 +39,7 @@ def sc_file_filter(sh_script_fp, mail=False, multi=False):
             print cmd
         else:
             if multi:   # 启用 多进程, 同时执行这个sh文件写命令
-                pros.append(multipros(cmd_exec, [cmd]))
+                pros.append(multipros(cmd_exec, [cmd], name=cmd))
             else:
                 cmd_exec(cmd, mail)
     p_exitcode = []
@@ -46,6 +48,11 @@ def sc_file_filter(sh_script_fp, mail=False, multi=False):
             p.join()
             p_exitcode.append((p.name, p.exitcode))
     print p_exitcode  #打印进程推出的状态q
+    for name, exitcode in p_exitcode:
+        if exitcode != 0:
+            print '[Error CMD:]', name
+        else:
+            print 'CMD: ', name
 
 
 def cmd_exec(cmd, mail=False):
@@ -58,7 +65,9 @@ def cmd_exec(cmd, mail=False):
         print error
         if mail:
             send_mail(sub='cmd error', content=error)
-        sys.exit(status)
+        # print status
+        # sys.exit(status)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

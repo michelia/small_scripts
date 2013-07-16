@@ -3,7 +3,8 @@
 
 import argparse , sys, textwrap, datetime
 
-from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert #, sam2fastq
+from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert, qualave, id_convert_trim #, sam2fastq
+from biomi_lib import modify_sam, modify_bam
 
 def main():
     function = 'biomi is a python program in bioinformatics.'
@@ -39,16 +40,16 @@ def main():
     cutseqParse = subparsers.add_parser('cutseq', help="按设定的长度截取seq",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''
-            按设定的长度截取seq, 并输出为指定的格式文件。
-                E.g: biomi cutseq sreq.fasta fasta seq_out.fasta fasta -f 6 -l 180
+            按设定的长度截取seq, 并输出为指定的格式文件。支持gz压缩的文件
+                E.g: biomi id_convert_trim sreq.fasta fasta seq_out.fasta fasta -f 6 -l 180
             '''))
     cutseqParse.add_argument('inputfile',help='the inputfile')
     cutseqParse.add_argument('inputfileformat', help='the format of inputfile')
     cutseqParse.add_argument('outfile', help='the outfile path, 注意是输出文件名')
     cutseqParse.add_argument('out_format', help='the format of outfile')
-    cutseqParse.add_argument('-f', type=int, default=1, help='First base to keep. Default is 1 (=first base).')
-    cutseqParse.add_argument('-l', type=int, help='Last base to keep. Default is entire read.\
-            如当 -l 150 时， 有的序列长度达到150, 则原样输出，只截取 大于150的read 到 150')
+    cutseqParse.add_argument('-f', type=int, default=1, metavar='FIRST', help='First base to keep. Default is 1 (=first base).')
+    cutseqParse.add_argument('-l', type=int, metavar='Last', help='Last base to keep. Default is entire read.\
+            如当 -l 150 时， 有的序列长度达到150, 则原样输出，只截取 大于150的read 到 150')  #默认的值是 None
     # cutseqParse.add_argument('--gz', action='store_true', help='输入输出都是gz压缩后的的文件。')
     cutseqParse.set_defaults(func=cutseq)
 
@@ -59,17 +60,71 @@ def main():
                 E.g: biomi checkQual example.fastq / example.fastq.gz
             '''))
     checkQualParse.add_argument('fastq', help='fastq文件或者是gz压缩的fastq文件')
-
     checkQualParse.set_defaults(func=checkQual)
+
+    trimQualAveParse = subparsers.add_parser('trimQualAve', help="指定一个qual的平均值, 去掉小于这个平均值的read,输出≥这个平均值的reads",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            指定一个qual的平均值, 去掉小于这个平均值的read,输出 ≥ 这个平均值的reads
+                E.g: biomi trimQualAve 20 example.fastq fastq result_ta_20.fastq fastq
+            支持读取gz压缩的文件, 但是输出的不是压缩文件
+            '''))
+    trimQualAveParse.add_argument('QualAve', type=int, help='read质量值的平均值')
+    trimQualAveParse.add_argument('fromFile')
+    trimQualAveParse.add_argument('fromFormat')
+    trimQualAveParse.add_argument('toFile')
+    trimQualAveParse.add_argument('toFormat')
+    trimQualAveParse.set_defaults(func=qualave)
+
     fq_id_convertParse = subparsers.add_parser('fq_id_convert', help='把格式2类型id转换成格式1型, 因为格式1常用',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''
-            把格式2类型id转换成格式1型, E.
-                因为格式1常用.g: biomi fq_id_convert example.fastq tosave.fastq
+            把格式2类型id转换成格式1型,因为格式1常用(没有空格)
+            E..g: biomi fq_id_convert example.fastq tosave.fastq
+            输入的可以是gz压缩的文件, 但输出的不是压缩文件
             '''))
     fq_id_convertParse.add_argument('infq', help='输入的fastq文件')
     fq_id_convertParse.add_argument('outfq', help='save out to outfq')
     fq_id_convertParse.set_defaults(func=fq_id_convert)
+
+
+    id_convert_trimParse = subparsers.add_parser('id_convert_trim', help="按设定的长度截取seq",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+        功能:
+            fastq id转换
+            fastq 32或64位转换
+            trim fastq read
+            所以文件格式是fastq
+            '''))
+    id_convert_trimParse.add_argument('infile',help='the inputfile')
+    id_convert_trimParse.add_argument('format', help='the format of inputfile')
+    id_convert_trimParse.add_argument('tofile', help='the outfile path, 注意是输出文件名')
+    id_convert_trimParse.add_argument('toFormat', help='the format of outfile')
+    id_convert_trimParse.add_argument('--id_convert', action='store_true', help='把格式2id转换成格式1,因为格式1常用(没有空格)')
+    id_convert_trimParse.add_argument('-f', type=int, default=1, metavar='First',help='First base to keep. Default is 1 (=first base).')
+    id_convert_trimParse.add_argument('-l', type=int, metavar='Last', help='Last base to keep. Default is entire read.如当 -l 150 时， 有的序列长度未达到150, 则原样输出; 大于150的read 截取到 150')  #默认的值是 None
+    id_convert_trimParse.set_defaults(func=id_convert_trim)
+
+    modify_samParse = subparsers.add_parser('modifysam', help='在染色体上的位置加上 chr, 只是对人的 human',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            在染色体上的位置加上 chr, 这是为了处理平台的产生bam/sam格式的缺陷
+            '''))
+    modify_samParse.add_argument('insam', help='输入的fastq文件')
+    modify_samParse.add_argument('tosam', help='save out to outfq')
+    modify_samParse.set_defaults(func=modify_sam)
+
+    modify_bamParse = subparsers.add_parser('modifybam', help='在染色体上的位置加上 chr, 只是对人的 human',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            在染色体上的位置加上 chr, 这是为了处理平台的产生bam格式的缺陷
+            这个程序是 modify_sam 的升级版, 一次解决bam文件问题, 速度更快
+            注意: inbam, tobam 文件后缀名 都是 .bam
+            '''))
+    modify_bamParse.add_argument('inbam', help='inbam.bam')
+    modify_bamParse.add_argument('tobam', help='tobam.bam')
+    modify_bamParse.set_defaults(func=modify_bam)
 
     # if len(sys.argv)==1:
     #     parser.parse_args(['-h'])

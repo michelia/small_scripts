@@ -1,0 +1,200 @@
+#!/usr/bin/env python
+#encoding=utf8
+
+import os, sys, argparse, textwrap
+from ruffus import *
+import logging
+from michelia import path, run_cmd
+
+
+parser = argparse.ArgumentParser(description='''
+            dsg_pipe_human.py "{'L374N': 115, 'L374T': 115}" -j 20 -p
+            ''')
+parser.add_argument('-v', '--verbose', dest='verbose',
+        action="count", default=0,
+        help="Print more detailed messages for each additional verbose level. E.g. run_parallel_blast --verbose --verbose --verbose ... (or -vvv)")
+
+parser.add_argument('task', metavar='task', choices=['modify_bam_index', 'miso_summarize', 'merge_summary', 'compare_sample', 'generate_result'], help='选择要执行的任务')
+
+
+parser.add_argument('sample_id_length', type=str,
+                    help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
+
+
+parser.add_argument("-j", "--jobs", dest="jobs",
+                    default=8,
+                    metavar="jobs",
+                    type=int,
+                    help="Specifies the number of jobs (operations) to run in parallel.")
+
+parser.add_argument("--flowchart", dest="flowchart",
+                    metavar="FILE",
+                    type=str,
+                    help="Print flowchart of the pipeline to FILE. Flowchart format "
+                       "depends on extension. Alternatives include ('.dot', '.jpg', "
+                       "'*.svg', '*.png' etc). Formats other than '.dot' require "
+                       "the dot program to be installed (http://www.graphviz.org/).")
+parser.add_argument("-n", "--just_print", dest="just_print",
+                    action="store_true", default=False,
+                    help="Only print a trace (description) of the pipeline. "
+                         " The level of detail is set by --verbose.")
+parser.add_argument("-p", dest="p",
+                    action="store_true", default=False,
+                    help="print run_cmd")
+args = parser.parse_args()
+
+if len(sys.argv)==1:
+    parser.parse_args(['-h'])
+
+def print_cmd(cmd):
+    print cmd
+
+if args.p:
+    run_cmd = print_cmd
+
+#88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
+
+#   Logger
+
+logger = logging.getLogger("run_parallel_blast")
+#
+# We are interesting in all messages
+#
+if args.verbose:
+    logger.setLevel(logging.DEBUG)
+    stderrhandler = logging.StreamHandler(sys.stderr)
+    stderrhandler.setFormatter(logging.Formatter("    %(message)s"))
+    stderrhandler.setLevel(logging.DEBUG)
+    logger.addHandler(stderrhandler)
+
+
+#88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
+#   Pipeline tasks
+
+samples_length = {'L374N': 115, 'L374T': 115}   #, 'L444N': 104, 'L444T': 104, 'L550N': 104, 'L550T': 104}
+samples_length = eval(args.sample_id_length)
+
+if type(samples_length) != dict:
+    raise Exception('sample_id_length的格式不对')
+if len(samples_length)<2:
+    raise Exception('样品数量至少是 2个.')
+
+sample_ids = samples_length.keys()  # sample_ids = ['L374N', 'L374T']
+id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
+sample_ids_name = []  # [['n'], ['t']]
+for sample_id in sample_ids:
+    sample_ids_name.append([sample_id])
+
+@follows(mkdir('tmp_flag'))
+@posttask(touch_file('tmp_flag/%s_flag_1_modify_bam_index' % id_all))
+@parallel(sample_ids_name)
+def modify_bam_index(sample_id):
+    if path('tmp_flag/%s_flag_1_modify_bam_index' % id_all).exists():
+        return
+    sample_id_name = {'name':sample_id}
+    run_cmd('biomi modifybam %(name)s_bam/accepted_hits.bam %(name)s_bam/accepted_hits.modify.bam' % sample_id_name)
+    run_cmd('rm %(name)s_bam/accepted_hits.bam; mv %(name)s_bam/accepted_hits.modify.bam %(name)s_bam/accepted_hits.bam' % sample_id_name)
+    run_cmd('samtools index %(name)s_bam/accepted_hits.bam' % sample_id_name)
+
+
+anotions = ['SE', 'A3SS', 'A5SS', 'MXE', 'RI']
+
+# # # # # #
+### 注意 序列的 测序的长度
+
+id_anotions = []
+for sample_id in sample_ids:
+    for anotion in anotions:
+        id_anotions.append([sample_id, anotion])
+# [['n', 'SE'],
+# ['n', 'A3SS']]
+
+@follows(modify_bam_index)
+@posttask(touch_file('tmp_flag/%s_flag_2_miso_summarize' % id_all))
+@parallel(id_anotions)
+def miso_summarize(sampleid, name):
+    if path('tmp_flag/%s_flag_2_miso_summarize' % id_all).exists():
+        return
+    anotion_name = {'anotion':name, 'sample_id':sampleid, 'length':samples_length[sampleid]}
+    run_cmd("run_events_analysis.py --compute-genes-psi /home/sgguo/database/human/h19/misopy/index/%(anotion)s %(sample_id)s_bam/accepted_hits.bam --output-dir %(sample_id)s_miso/%(anotion)s --read-len %(length)s -p 15" % anotion_name)
+    run_cmd("run_miso.py --summarize-samples %(sample_id)s_miso/%(anotion)s %(sample_id)s_miso/summary/%(anotion)s" % anotion_name)
+    run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % anotion_name)
+    if name == 'SE':
+        run_cmd("head -1 %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add > %(sample_id)s_miso/summary/header.txt" % anotion_name)
+    run_cmd("sed -i 1d %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % anotion_name)
+
+
+# sample_ids_summary = [['n'], ['t']]
+sample_ids_summary = []
+for sample_id in sample_ids:
+    sample_ids_summary.append([sample_id])
+
+# @follows(n_miso_summarize, t_miso_summarize)
+@follows(miso_summarize)
+@parallel(sample_ids_summary)
+@posttask(touch_file('tmp_flag/%s_flag_3_merge_summary' % id_all))
+def merge_summary(name):
+    if path('tmp_flag/%s_flag_3_merge_summary' % id_all).exists():
+        return
+    sample_id = {'id':name}
+    run_cmd("cat %(id)s_miso/summary/*/summary/*.miso_summary_add > %(id)s_miso/summary/%(id)s_miso.sumarize_all_events.bf" % sample_id)
+
+anotions_name = []
+for anotion in anotions:
+    anotions_name.append([anotion] + sample_ids)
+@follows(merge_summary)
+@parallel(anotions_name)
+@posttask(touch_file('tmp_flag/%s_flag_4_compare_sample' % id_all))
+def compare_sample(name, id1, id2):
+    if path('tmp_flag/%s_flag_3_compare_sample' % id_all).exists():
+        return
+    anotion_name = {'anotion':name, 'id_one':id1, 'id_two':id2, 'id_all': id_all}
+    run_cmd("run_miso.py --compare-samples %(id_one)s_miso/%(anotion)s %(id_two)s_miso/%(anotion)s %(id_all)s_miso_comparisons/%(anotion)s" % anotion_name)
+    run_cmd("perl /home/sgguo/script/add_type.pl %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf %(anotion)s %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add" % anotion_name)
+    run_cmd("sed -i 1d %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add" % anotion_name)
+    run_cmd("filter_events.py --filter %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf  --num-inc 1 --num-exc 1 --num-sum-inc-exc 10 --delta-psi 0.20 --bayes-factor 10 --output-dir %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/" % anotion_name)
+    run_cmd("perl script/add_type.pl %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered %(anotion)s %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered_add" % anotion_name)
+    if name=='SE':
+        run_cmd('head -1 %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add > %(id_all)s_miso_comparisons/header.txt' % anotion_name)
+    run_cmd("sed -i 1d %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered_add" % anotion_name)
+
+@follows(compare_sample)
+@posttask(touch_file('tmp_flag/%s_flag_5_merge_comparisons' % id_all))
+def merge_comparisons():
+    if path('tmp_flag/%s_flag_3_merge_comparisons' % id_all).exists():
+        return
+    # 88888888888888888888888
+    # 好像没有用到
+    run_cmd("cat %(id_all)s_miso_comparisons/*/*/*/*.miso_bf_add > %(id_all)s_miso_comparisons/s1.vs.s2.all_events.bf" % {'id_all':id_all})
+
+
+@follows(compare_sample)
+def merge_comparisons_filtered():
+    run_cmd("cat %(id_all)s_miso_comparisons/*/*/*/*.miso_bf.filtered_add > %(id_all)s_miso_comparisons/s1.vs.s2.filter_all_events.bf" % {'id_all':id_all})
+
+@follows(merge_comparisons, merge_comparisons_filtered)
+def generate_result():
+    run_cmd('perl add_pairwise.pl %(id_all)s_miso_comparisons/s1.vs.s2.filter_all_events.bf s1_vs_s2 %(id_all)s_results/raw_events.tsv' % {'id_all':id_all})
+    run_cmd("sed -i 1i'group    type    event_name  sample1_posterior_mean  sample1_ci_low  sample1_ci_high sample2_posterior_mean  sample2_ci_low  sample2_ci_high diff    bayes_factor    isoforms    sample1_counts  sample1_assigned_counts sample2_counts  sample2_assigned_counts chrom   strand  mRNA_starts mRNA_ends' %(id_all)s_results/raw_events.tsv" % {'id_all':id_all})
+# 88888888888888888888888888888888888888
+# 下面这一行命令有待研究  :  not  产生一次就可以了
+    return
+    run_cmd("perl generate_event2gene_ref_v0.4above.pl mouse_event2gene_ref_0.4above.txt ../../mm10/*.mm10.gff3")
+
+
+exce_task = eval(args.task)
+
+if args.just_print:
+    pipeline_printout(sys.stdout, [exce_task], verbose=args.verbose)
+elif args.flowchart:
+    # use file extension for output format
+    output_format = os.path.splitext(args.flowchart)[1][1:]
+    pipeline_printout_graph (open(args.flowchart, "w"),
+                             output_format,
+                             [exce_task],
+                             no_key_legend = True)
+    os.system('eog %s' % args.flowchart)
+else:
+    pipeline_run([exce_task],  multiprocess = args.jobs,
+                        logger = logger, verbose=args.verbose)
+
