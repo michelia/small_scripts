@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='''
             mouse-pipe-align "{'L374N': 115, 'L374T': 115}" -j 20 -p
             ''')
 parser.add_argument('-v', '--verbose', dest='verbose',
-        action="count", default=0,
+        action="count", default=3,
         help="Print more detailed messages for each additional verbose level. E.g. run_parallel_blast --verbose --verbose --verbose ... (or -vvv)")
 
 parser.add_argument('task', metavar='task', choices=['plot'], help='选择要执行的任务')
@@ -74,12 +74,11 @@ if args.verbose:
 
 # samples_length = {'L374N': 115, 'L374T': 115}   #, 'L444N': 104, 'L444T': 104, 'L550N': 104, 'L550T': 104}
 samples_length = eval(args.sample_id_length)
-
 if type(samples_length) != dict:
     raise Exception('sample_id_length的格式不对')
 
 sample_ids = samples_length.keys()  # sample_ids = ['L374N', 'L374T']
-id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
+# id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
 sample_ids_name = []  # [['n'], ['t']]
 for sample_id in sample_ids:
     sample_ids_name.append([sample_id])
@@ -92,7 +91,16 @@ for sample_id in sample_ids:
     file_list.append(sample_id)
     dna_tophat_align_files.append(file_list)
 
-@follows(mkdir('tmp_flag'))
+cdna_tophat_align_files = []
+for sample_id in sample_ids:
+    file_list = []
+    file_list.append('../../fastq64/%sr1.fastq-illumina' % sample_id)
+    file_list.append('%s_cdna_align/accepted_hits.bam' % sample_id)
+    file_list.append(sample_id)
+    cdna_tophat_align_files.append(file_list)
+
+
+# @follows(para_deal)
 @files(dna_tophat_align_files)
 def dna_tophat_align(infile, outfile, sample_id):
     dict_para = {'fastqone':infile, 'sample_id': sample_id}
@@ -108,15 +116,7 @@ def stat_sam(infile, outfile):
     run_cmd('perl /home/sgguo/script/parse_sam_v1.3.pl %s > %s' % (infile, outfile))
 
 
-cdna_tophat_align_files = []
-for sample_id in sample_ids:
-    file_list = []
-    file_list.append('../../fastq64/%sr1.fastq-illumina' % sample_id)
-    file_list.append('%s_cdna_align/accepted_hits.bam' % sample_id)
-    file_list.append(sample_id)
-    cdna_tophat_align_files.append(file_list)
-
-@follows(mkdir('tmp_flag'))
+# @follows(para_deal)
 @files(cdna_tophat_align_files)
 def cdna_tophat_align(infile, outfile, sample_id):
     dict_para = {'fastqone':infile, 'sample_id': sample_id}
@@ -129,18 +129,6 @@ def bam_depth(infile, outfile):
 @follows(stat_sam, bam_depth)
 def plot():
     print 'plot pass'
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 exce_task = eval(args.task)
