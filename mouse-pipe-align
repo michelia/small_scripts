@@ -10,16 +10,14 @@ from michelia import path, run_cmd
 parser = argparse.ArgumentParser(description='''
             mouse-pipe-align "{'L374N': 115, 'L374T': 115}" -j 20 -p
             ''')
+
+parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
+parser.add_argument('insert_size', type=int, help='插入片段长度')
+parser.add_argument('sample_id_length', type=str,
+                    help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
 parser.add_argument('-v', '--verbose', dest='verbose',
         action="count", default=3,
         help="Print more detailed messages for each additional verbose level. E.g. run_parallel_blast --verbose --verbose --verbose ... (or -vvv)")
-
-parser.add_argument('task', metavar='task', choices=['plot'], help='选择要执行的任务')
-
-
-parser.add_argument('sample_id_length', type=str,
-                    help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
-
 
 parser.add_argument("-j", "--jobs", dest="jobs",
                     default=8,
@@ -104,15 +102,17 @@ for sample_id in sample_ids:
 @files(dna_tophat_align_files)
 def dna_tophat_align(infile, outfile, sample_id):
     dict_para = {'fastqone':infile, 'sample_id': sample_id}
-    run_cmd('tophat2 -o %(sample_id)s_dna_align -g 1 -p 20 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/dna/Mus_musculus.GRCm38.71.dna %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
+    run_cmd('tophat2 -o %(sample_id)s_dna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/dna/Mus_musculus.GRCm38.71.dna %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
 
 @transform(dna_tophat_align, suffix('.bam'), '.sam')
 def bam_index_tosam(infile, outfile):
+    # dna bam index and to sam
     run_cmd('samtools index %s' % infile)
     run_cmd('samtools view -h %s > %s' % (infile, outfile))
 
 @transform(bam_index_tosam, suffix('.sam'), '.stat')
 def stat_sam(infile, outfile):
+    # dna sam stat
     run_cmd('perl /home/sgguo/script/parse_sam_v1.3.pl %s > %s' % (infile, outfile))
 
 
@@ -120,30 +120,59 @@ def stat_sam(infile, outfile):
 @files(cdna_tophat_align_files)
 def cdna_tophat_align(infile, outfile, sample_id):
     dict_para = {'fastqone':infile, 'sample_id': sample_id}
-    run_cmd('tophat2 -o %(sample_id)s_cdna_align -g 1 -p 20 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
+    run_cmd('tophat2 -o %(sample_id)s_cdna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
 
 @transform(cdna_tophat_align, suffix('.bam'), '.dep')
 def bam_depth(infile, outfile):
+    # cdna bam depth
     run_cmd('samtools depth %s > %s' % (infile, outfile))
 
-@follows(stat_sam, bam_depth)
-def plot():
-    print 'plot pass'
+@follows(bam_depth)
+@transform(bam_depth, suffix('.dep'), '.cov')
+def reads_coverage(infile, outfile):
+    run_cmd('perl /home/sgguo/script/reads_coverage.v2.0.pl /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all.fa.len %s %s 100 300' % (infile, outfile))
+
+# @follows(stat_sam, bam_depth)
+@transform(reads_coverage, regex(r'accepted_hits.cov'), 'gene_cov.pdf')
+def cov_plot(infile, outfile):
+    run_cmd('Rscript /home/sgguo/script/cov_plot_v2.3.R %s %s %s' % (infile, args.insert_size, outfile))
+
+def make_data_info(sample_ids, info_file):
+    data_info = open(info_file, 'w')
+    data_info.write('sample_' + '\tsample_'.join(map(str,range(1, len(sample_ids)+1))) +'\n')
+    data_info.write('\t'.join(sample_ids) + '\n')
+    data_info.close()
+
+@merge(cdna_tophat_align, None)
+def deg_cuffdiff(infiles, outfile):
+    bams = ' '.join(sorted(infiles))
+    run_cmd('cuffdiff -o ../deg_cuffdiff -L s1,s2 -u -p 6 --library-type fr-unstranded --dispersion-method pooled --library-norm-method geometric -m %s -s 50 /home/sgguo/database/mouse/Mus_musculus.GRCm38.71.gtf %s' % (args.insert_size, bams))
+
+@follows(deg_cuffdiff)
+@files('../deg_cuffdiff/genes.fpkm_tracking', '../deg_plots/')
+def deg_plots(infile, outfile):
+    make_data_info(sample_ids, '../deg_plots/data_info')
+    run_cmd('Rscript /home/sgguo/script/deg_plots.R ../deg_cuffdiff/ ../deg_plots ../data_info 0.05 1 s')
 
 
-exce_task = eval(args.task)
+@merge(['infile1', 'infile2'], None)
+def test(infile, outfile):
+    print infile
+    print outfile
+
+exce_task = [eval(args.task), stat_sam]
 
 if args.just_print:
-    pipeline_printout(sys.stdout, [exce_task], verbose=args.verbose)
+    pipeline_printout(sys.stdout, exce_task, verbose=args.verbose)
 elif args.flowchart:
     # use file extension for output format
     output_format = os.path.splitext(args.flowchart)[1][1:]
     pipeline_printout_graph (open(args.flowchart, "w"),
                              output_format,
-                             [exce_task],
+                             exce_task,
                              no_key_legend = True)
     os.system('eog %s' % args.flowchart)
 else:
-    pipeline_run([exce_task],  multiprocess = args.jobs,
+    pipeline_run(exce_task,  multiprocess = args.jobs,
                         logger = logger, verbose=args.verbose)
 
