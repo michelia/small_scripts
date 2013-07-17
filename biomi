@@ -132,10 +132,10 @@ def main():
     args.func(args)
 
 
-if __name__ == '__main__':
-    startTime = datetime.datetime.now()
-    print
-    main()
-    print
-    print '[INFO] Success!    Used time: %s' % (datetime.datetime.now()-startTime)
-    print
+# if __name__ == '__main__':
+startTime = datetime.datetime.now()
+print
+main()
+print
+print '[INFO] Success!    Used time: %s' % (datetime.datetime.now()-startTime)
+print
