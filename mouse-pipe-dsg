@@ -11,10 +11,10 @@ parser = argparse.ArgumentParser(description='''
             mouse-pipe-align "{'L374N': 115, 'L374T': 115}" -j 20 -p
             ''')
 
-parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
+# parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
 parser.add_argument('insert_size', type=int, help='插入片段长度')
 parser.add_argument('sample_id_length', type=str,
-                    help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
+                    help='''这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: "{'L374N': 115, 'L374T': 115}"''')
 parser.add_argument('-v', '--verbose', dest='verbose',
         action="count", default=3,
         help="Print more detailed messages for each additional verbose level. E.g. run_parallel_blast --verbose --verbose --verbose ... (or -vvv)")
@@ -69,98 +69,88 @@ if args.verbose:
 #88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
 #   Pipeline tasks
 
-
-# samples_length = {'L374N': 115, 'L374T': 115}   #, 'L444N': 104, 'L444T': 104, 'L550N': 104, 'L550T': 104}
 samples_length = eval(args.sample_id_length)
+
 if type(samples_length) != dict:
     raise Exception('sample_id_length的格式不对')
+if len(samples_length)!=2:
+    raise Exception('样品数量不是2个.')
 
 sample_ids = samples_length.keys()  # sample_ids = ['L374N', 'L374T']
-# id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
-sample_ids_name = []  # [['n'], ['t']]
+id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
+anotions = ['SE', 'A3SS', 'A5SS', 'MXE', 'RI']
+run_events_analysis_para = []
 for sample_id in sample_ids:
-    sample_ids_name.append([sample_id])
+    for anotion in anotions:
+        one = []
+        outdir = '%s_miso/%s' % (sample_id, anotion)
+        one.append('%s_dna_align/accepted_hits.bam' % sample_id)
+        one.append('%s/flag.%s.%s.eventflagcomplete' % (outdir, sample_id, anotion))
+        one.append(samples_length[sample_id])
+        one.append(outdir)
+        one.append(anotion)
+        run_events_analysis_para.append(one)
 
-dna_tophat_align_files = []
+
+@files(run_events_analysis_para)
+def run_events_analysis(infile, outfile, length, outdir, anotion):
+    '''infile is the bam file, outfile is a complete flag file'''
+    run_cmd("run_events_analysis.py --compute-genes-psi /home/sgguo/database/mouse/mm10-miso-index/%s %s --output-dir %s --read-len %s -p 6" % (anotion, infile, outdir, length))
+    open(outfile, 'w')
+
+@transform(run_events_analysis, suffix('.eventflagcomplete'), '.summarycomplete',)
+def run_miso_summary(infile, outfile):
+    '''sample_id and anotion infomation come from infile '''
+    para = infile.split('.')
+    para = {'sample_id': para[-3], 'anotion': para[-2]}
+    run_cmd("run_miso.py --summarize-samples %(sample_id)s_miso/%(anotion)s %(sample_id)s_miso/summary/%(anotion)s" % para)
+    open(outfile, 'w')
+
+@transform(run_miso_summary, suffix('.summarycomplete'), '.miso_summary_add_complete')
+def summary_add_type(infile, outfile):
+    para = infile.split('.')
+    para = {'sample_id': para[-3], 'anotion': para[-2]}
+    rum_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % para)
+    if para['anotion']=='SE':
+        run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % para)
+    run_cmd("sed -i 1d %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % para)
+    open(outfile, 'w')
+
+merge_summay_para = []
 for sample_id in sample_ids:
-    file_list = []
-    file_list.append('../../fastq64/%sr1.fastq-illumina' % sample_id)
-    file_list.append('%s_dna_align/accepted_hits.bam' % sample_id)
-    file_list.append(sample_id)
-    dna_tophat_align_files.append(file_list)
+    one = []
+    one.append('%(id)s_miso/RI/flag.%(id)s.RI.miso_summary_add_complete' % {'id':sample_id})
+    one.append('%(id)s_miso/summary/%(id)s.sumarize_all_events.bf' % {'id':sample_id})
+    one.append(sample_id)
+    merge_summay_para.append(one)
 
-cdna_tophat_align_files = []
-for sample_id in sample_ids:
-    file_list = []
-    file_list.append('../../fastq64/%sr1.fastq-illumina' % sample_id)
-    file_list.append('%s_cdna_align/accepted_hits.bam' % sample_id)
-    file_list.append(sample_id)
-    cdna_tophat_align_files.append(file_list)
+@follows(summary_add_type)
+@files(merge_summay_para)
+def merge_summay(infile, outfile, sample_id):
+    sample_id = {'id':name}
+    run_cmd("cat %s_miso/summary/*/summary/*.miso_summary_add > %s" % (sample_id, outfile))
 
 
-# @follows(para_deal)
-@files(dna_tophat_align_files)
-def dna_tophat_align(infile, outfile, sample_id):
-    dict_para = {'fastqone':infile, 'sample_id': sample_id}
-    run_cmd('tophat2 -o %(sample_id)s_dna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/dna/Mus_musculus.GRCm38.71.dna %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
+compare_sample_para = []
+for anotion in anotions:
+    one = []
+    one.append('%(id)s_miso/%(anotion)s/flag.%(id)s.%(anotion)s.summarycomplete' % {'id':sample_ids[0], 'anotion':anotion})
+    one.append('%s_miso_comparisons/flag.%s.compare_sample_complete' % (id_all, anotion))
+    one.append(anotion)
+    one.append(sample_ids[0])
+    one.append(sample_ids[1])
+    compare_sample_para.append(one)
 
-@transform(dna_tophat_align, suffix('.bam'), '.sam')
-def bam_index_tosam(infile, outfile):
-    # dna bam index and to sam
-    run_cmd('samtools index %s' % infile)
-    run_cmd('samtools view -h %s > %s' % (infile, outfile))
-
-@transform(bam_index_tosam, suffix('.sam'), '.stat')
-def stat_sam(infile, outfile):
-    # dna sam stat
-    run_cmd('perl /home/sgguo/script/parse_sam_v1.3.pl %s > %s' % (infile, outfile))
-
-
-# @follows(para_deal)
-@files(cdna_tophat_align_files)
-def cdna_tophat_align(infile, outfile, sample_id):
-    dict_para = {'fastqone':infile, 'sample_id': sample_id}
-    run_cmd('tophat2 -o %(sample_id)s_cdna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
-
-@transform(cdna_tophat_align, suffix('.bam'), '.dep')
-def bam_depth(infile, outfile):
-    # cdna bam depth
-    run_cmd('samtools depth %s > %s' % (infile, outfile))
-
-@follows(bam_depth)
-@transform(bam_depth, suffix('.dep'), '.cov')
-def reads_coverage(infile, outfile):
-    run_cmd('perl /home/sgguo/script/reads_coverage.v2.0.pl /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all.fa.len %s %s 100 300' % (infile, outfile))
-
-# @follows(stat_sam, bam_depth)
-@transform(reads_coverage, regex(r'accepted_hits.cov'), 'gene_cov.pdf')
-def cov_plot(infile, outfile):
-    run_cmd('Rscript /home/sgguo/script/cov_plot_v2.3.R %s %s %s' % (infile, args.insert_size, outfile))
-
-def make_data_info(sample_ids, info_file):
-    data_info = open(info_file, 'w')
-    data_info.write('sample_' + '\tsample_'.join(map(str,range(1, len(sample_ids)+1))) +'\n')
-    data_info.write('\t'.join(sample_ids) + '\n')
-    data_info.close()
-
-@merge(cdna_tophat_align, None)
-def deg_cuffdiff(infiles, outfile):
-    bams = ' '.join(sorted(infiles))
-    run_cmd('cuffdiff -o ../deg_cuffdiff -L s1,s2 -u -p 6 --library-type fr-unstranded --dispersion-method pooled --library-norm-method geometric -m %s -s 50 /home/sgguo/database/mouse/Mus_musculus.GRCm38.71.gtf %s' % (args.insert_size, bams))
-
-@follows(deg_cuffdiff)
-@files('../deg_cuffdiff/genes.fpkm_tracking', '../deg_plots/')
-def deg_plots(infile, outfile):
-    make_data_info(sample_ids, '../deg_plots/data_info')
-    run_cmd('Rscript /home/sgguo/script/deg_plots.R ../deg_cuffdiff/ ../deg_plots ../data_info 0.05 1 s')
+@follows(run_miso_summary)
+@files(compare_sample_para)
+def compare_sample(infile, outfile, anotion, id1, id2):
+    anotion_name = {'anotion':anotion, 'id_one':id1, 'id_two':id2, 'id_all': id_all}
+    run_cmd("run_miso.py --compare-samples %(id_one)s_miso/%(anotion)s %(id_two)s_miso/%(anotion)s %(id_all)s_miso_comparisons/%(anotion)s" % anotion_name)
+    open(outfile, 'w')
 
 
-@merge(['infile1', 'infile2'], None)
-def test(infile, outfile):
-    print infile
-    print outfile
-
-exce_task = [eval(args.task), stat_sam]
+# exce_task = [eval(args.task), stat_sam]
+exce_task = [merge_summay, compare_sample]
 
 if args.just_print:
     pipeline_printout(sys.stdout, exce_task, verbose=args.verbose)
