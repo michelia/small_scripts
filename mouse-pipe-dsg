@@ -20,7 +20,7 @@ parser.add_argument('-v', '--verbose', dest='verbose',
         help="Print more detailed messages for each additional verbose level. E.g. run_parallel_blast --verbose --verbose --verbose ... (or -vvv)")
 
 parser.add_argument("-j", "--jobs", dest="jobs",
-                    default=8,
+                    default=4,
                     metavar="jobs",
                     type=int,
                     help="Specifies the number of jobs (operations) to run in parallel.")
@@ -73,11 +73,11 @@ samples_length = eval(args.sample_id_length)
 
 if type(samples_length) != dict:
     raise Exception('sample_id_length的格式不对')
-if len(samples_length)!=2:
-    raise Exception('样品数量不是2个.')
+# if len(samples_length)!=2:
+#     raise Exception('样品数量不是2个.')
 
 sample_ids = samples_length.keys()  # sample_ids = ['L374N', 'L374T']
-id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
+id_all = '_'.join(sample_ids)  # L374N_L374T
 anotions = ['SE', 'A3SS', 'A5SS', 'MXE', 'RI']
 run_events_analysis_para = []
 for sample_id in sample_ids:
@@ -85,7 +85,7 @@ for sample_id in sample_ids:
         one = []
         outdir = '%s_miso/%s' % (sample_id, anotion)
         one.append('%s_dna_align/accepted_hits.bam' % sample_id)
-        one.append('%s/flag.%s.%s.eventflagcomplete' % (outdir, sample_id, anotion))
+        one.append('%s_miso/flag.%s.%s.eventflagcomplete' % (sample_id, sample_id, anotion))
         one.append(samples_length[sample_id])
         one.append(outdir)
         one.append(anotion)
@@ -103,24 +103,24 @@ def run_miso_summary(infile, outfile):
     '''sample_id and anotion infomation come from infile '''
     para = infile.split('.')
     para = {'sample_id': para[-3], 'anotion': para[-2]}
-    run_cmd("run_miso.py --summarize-samples %(sample_id)s_miso/%(anotion)s %(sample_id)s_miso/summary/%(anotion)s" % para)
+    run_cmd("run_miso.py --summarize-samples %(sample_id)s_miso/%(anotion)s %(sample_id)s_miso/" % para)
     open(outfile, 'w')
 
 @transform(run_miso_summary, suffix('.summarycomplete'), '.miso_summary_add_complete')
 def summary_add_type(infile, outfile):
     para = infile.split('.')
     para = {'sample_id': para[-3], 'anotion': para[-2]}
-    rum_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % para)
+    rum_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
     if para['anotion']=='SE':
-        run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % para)
-    run_cmd("sed -i 1d %(sample_id)s_miso/summary/%(anotion)s/summary/%(anotion)s.miso_summary_add" % para)
+        run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
+    run_cmd("sed -i 1d %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
     open(outfile, 'w')
 
 merge_summay_para = []
 for sample_id in sample_ids:
     one = []
-    one.append('%(id)s_miso/RI/flag.%(id)s.RI.miso_summary_add_complete' % {'id':sample_id})
-    one.append('%(id)s_miso/summary/%(id)s.sumarize_all_events.bf' % {'id':sample_id})
+    one.append('%(id)s_miso/flag.%(id)s.RI.miso_summary_add_complete' % {'id':sample_id})
+    one.append('%(id)s_miso/%(id)s.sumarize_all_events.bf' % {'id':sample_id})
     one.append(sample_id)
     merge_summay_para.append(one)
 
@@ -128,7 +128,7 @@ for sample_id in sample_ids:
 @files(merge_summay_para)
 def merge_summay(infile, outfile, sample_id):
     sample_id = {'id':name}
-    run_cmd("cat %s_miso/summary/*/summary/*.miso_summary_add > %s" % (sample_id, outfile))
+    run_cmd("cat %s_miso/summary/*.miso_summary_add > %s" % (sample_id, outfile))
 
 
 compare_sample_para = []
@@ -150,7 +150,8 @@ def compare_sample(infile, outfile, anotion, id1, id2):
 
 
 # exce_task = [eval(args.task), stat_sam]
-exce_task = [merge_summay, compare_sample]
+# exce_task = [merge_summay, compare_sample]
+exce_task = [merge_summay]
 
 if args.just_print:
     pipeline_printout(sys.stdout, exce_task, verbose=args.verbose)
