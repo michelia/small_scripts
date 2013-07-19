@@ -114,7 +114,6 @@ def run_miso_summary(infile, outfile):
 def summary_add_type(infile, outfile):
     para = infile.split('.')
     para = {'sample_id': para[-3], 'anotion': para[-2]}
-    run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
     run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
     if para['anotion']=='SE':
         run_cmd("head -1 %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add > %(sample_id)s_miso/summary/header.txt" % para)
