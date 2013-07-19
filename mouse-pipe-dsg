@@ -4,7 +4,7 @@
 import os, sys, argparse, textwrap
 from ruffus import *
 import logging
-from michelia import path, run_cmd
+from michelia import path, run_cmd, path
 
 
 parser = argparse.ArgumentParser(description='''
@@ -85,17 +85,21 @@ for sample_id in sample_ids:
         one = []
         outdir = '%s_miso/%s' % (sample_id, anotion)
         one.append('%s_dna_align/accepted_hits.bam' % sample_id)
-        one.append('%s_miso/flag.%s.%s.eventflagcomplete' % (sample_id, sample_id, anotion))
+        one.append('%s_miso/complete_flag/flag.%s.%s.eventflagcomplete' % (sample_id, sample_id, anotion))
         one.append(samples_length[sample_id])
         one.append(outdir)
         one.append(anotion)
+        one.append(sample_id)
         run_events_analysis_para.append(one)
 
 
 @files(run_events_analysis_para)
-def run_events_analysis(infile, outfile, length, outdir, anotion):
+def run_events_analysis(infile, outfile, length, outdir, anotion, sample_id):
     '''infile is the bam file, outfile is a complete flag file'''
     run_cmd("run_events_analysis.py --compute-genes-psi /home/sgguo/database/mouse/mm10-miso-index/%s %s --output-dir %s --read-len %s -p 6" % (anotion, infile, outdir, length))
+    outdir = '%s_miso/complete_flag' % sample_id
+    if not path(outdir).exists():
+        path(outdir).mkdir()
     open(outfile, 'w')
 
 @transform(run_events_analysis, suffix('.eventflagcomplete'), '.summarycomplete',)
@@ -110,16 +114,17 @@ def run_miso_summary(infile, outfile):
 def summary_add_type(infile, outfile):
     para = infile.split('.')
     para = {'sample_id': para[-3], 'anotion': para[-2]}
-    rum_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
+    run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
+    run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
     if para['anotion']=='SE':
-        run_cmd("perl /home/sgguo/script/add_type.pl %(sample_id)s_miso/summary/%(anotion)s.miso_summary %(anotion)s  %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
+        run_cmd("head -1 %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add > %(sample_id)s_miso/summary/header.txt" % para)
     run_cmd("sed -i 1d %(sample_id)s_miso/summary/%(anotion)s.miso_summary_add" % para)
     open(outfile, 'w')
 
 merge_summay_para = []
 for sample_id in sample_ids:
     one = []
-    one.append('%(id)s_miso/flag.%(id)s.RI.miso_summary_add_complete' % {'id':sample_id})
+    one.append('%(id)s_miso/complete_flag/flag.%(id)s.RI.miso_summary_add_complete' % {'id':sample_id})
     one.append('%(id)s_miso/%(id)s.sumarize_all_events.bf' % {'id':sample_id})
     one.append(sample_id)
     merge_summay_para.append(one)
@@ -127,7 +132,6 @@ for sample_id in sample_ids:
 @follows(summary_add_type)
 @files(merge_summay_para)
 def merge_summay(infile, outfile, sample_id):
-    sample_id = {'id':name}
     run_cmd("cat %s_miso/summary/*.miso_summary_add > %s" % (sample_id, outfile))
 
 

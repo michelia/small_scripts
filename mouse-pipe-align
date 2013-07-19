@@ -84,7 +84,7 @@ for sample_id in sample_ids:
 dna_tophat_align_files = []
 for sample_id in sample_ids:
     file_list = []
-    file_list.append('../../fastq64/%sr1.fastq-illumina' % sample_id)
+    file_list.append('../fastq64/%sr1.fastq-illumina' % sample_id)
     file_list.append('%s_dna_align/accepted_hits.bam' % sample_id)
     file_list.append(sample_id)
     dna_tophat_align_files.append(file_list)
@@ -92,7 +92,7 @@ for sample_id in sample_ids:
 cdna_tophat_align_files = []
 for sample_id in sample_ids:
     file_list = []
-    file_list.append('../../fastq64/%sr1.fastq-illumina' % sample_id)
+    file_list.append('../fastq64/%sr1.fastq-illumina' % sample_id)
     file_list.append('%s_cdna_align/accepted_hits.bam' % sample_id)
     file_list.append(sample_id)
     cdna_tophat_align_files.append(file_list)
@@ -102,7 +102,7 @@ for sample_id in sample_ids:
 @files(dna_tophat_align_files)
 def dna_tophat_align(infile, outfile, sample_id):
     dict_para = {'fastqone':infile, 'sample_id': sample_id}
-    run_cmd('tophat2 -o %(sample_id)s_dna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/dna/Mus_musculus.GRCm38.71.dna %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
+    run_cmd('tophat2 -o %(sample_id)s_dna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/dna/Mus_musculus.GRCm38.71.dna %(fastqone)s ../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
 
 @transform(dna_tophat_align, suffix('.bam'), '.sam')
 def bam_index_tosam(infile, outfile):
@@ -120,7 +120,7 @@ def stat_sam(infile, outfile):
 @files(cdna_tophat_align_files)
 def cdna_tophat_align(infile, outfile, sample_id):
     dict_para = {'fastqone':infile, 'sample_id': sample_id}
-    run_cmd('tophat2 -o %(sample_id)s_cdna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all %(fastqone)s ../../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
+    run_cmd('tophat2 -o %(sample_id)s_cdna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all %(fastqone)s ../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
 
 @transform(cdna_tophat_align, suffix('.bam'), '.dep')
 def bam_depth(infile, outfile):
