@@ -11,7 +11,9 @@ parser = argparse.ArgumentParser(description='''
             dsg_pipe_human.py "{'L374N': 115, 'L374T': 115}" -j 20 -p
             ''')
 
-parser.add_argument('task', metavar='task', choices=['modify_bam_index', 'miso_summarize', 'merge_summary', 'compare_sample', 'generate_result'], help='选择要执行的任务')
+parser.add_argument('task', metavar='task',
+                # choices=['modify_bam_index', 'miso_summarize', 'merge_summary', 'compare_sample', 'generate_result'],
+                help='选择要执行的任务')
 parser.add_argument('insert_size', type=int, help='插入片段长度')
 parser.add_argument('sample_id_length', type=str,
                     help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
@@ -45,14 +47,7 @@ args = parser.parse_args()
 if len(sys.argv)==1:
     parser.parse_args(['-h'])
 
-# def print_cmd(cmd):
-#     print cmd
-
-# if args.p:
-#     run_cmd = print_cmd
-
 #88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
-
 #   Logger
 
 logger = logging.getLogger("run_parallel_blast")
@@ -80,8 +75,10 @@ if type(samples_length) != dict:
 
 sample_ids = samples_length.keys()  # sample_ids = ['L374N', 'L374T']
 # id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
+id_all = '_'.join(sample_ids)
 
-anotions = ['SE', 'A3SS', 'A5SS', 'MXE', 'RI']
+# anotions = ['SE', 'A3SS', 'A5SS', 'MXE', 'RI']
+anotions = ['SE', 'A3SS', 'A5SS', 'MXE']
 
 modify_bam_index_para = []
 for sample_id in sample_ids:
@@ -96,7 +93,6 @@ def modify_bam(infile, outfile):
 
 @transform(modify_bam, suffix('.bam'), '.bam.bai')
 def index_bam(infile, outfile):
-    # print '##############################', outfile
     run_cmd('samtools index %s' % infile)
 
 run_events_analysis_para = []
@@ -138,7 +134,7 @@ def summary_add_type(infile, outfile):
 merge_summary_para = []
 for sample_id in sample_ids:
     one = []
-    one.append('%s_miso/complete_flag/flag.%s.RI.summary_add_type_complete' % (sample_id, sample_id))
+    one.append('%s_miso/complete_flag/flag.%s.SE.summary_add_type_complete' % (sample_id, sample_id))
     one.append('%(id)s_miso/summary/%(id)s_miso.sumarize_all_events.bf' % {'id':sample_id})
     one.append(sample_id)
     merge_summary_para.append(one)
@@ -147,29 +143,79 @@ for sample_id in sample_ids:
 def merge_summary(infile, outfile, sample_id):
     run_cmd("cat %(id)s_miso/summary/*.miso_summary_add > %(bf)s" % {'id':sample_id, 'bf':outfile})
 
-@follows(run_miso_summarize_samples)
-def run_miso_compare_samples(infile, outfile):
-    para = {'anotion':name, 'id_one':id1, 'id_two':id2, 'id_all': id_all}
-    run_cmd("run_miso.py --compare-samples %(id_one)s_miso/%(anotion)s %(id_two)s_miso/%(anotion)s %(id_all)s_miso_comparisons/%(anotion)s" % para)
+run_miso_summarize_samples_para = []
+for anotion in anotions:
+    one = []
+    one.append('%s_miso/complete_flag/flag.%s.%s.compute-genes-psi-complete' % (sample_ids[0], sample_ids[0], anotion))
+    one.append('%(id_all)s_miso_comparisons/complete_flag/flag.%(id_all)s.%(anotion)s.compare_complete' % {'id_all': id_all, 'anotion':anotion})
+    one.append(anotion)
+    one.append(sample_ids)
+    run_miso_summarize_samples_para.append(one)
+
+@follows(run_events_analysis)
+@files(run_miso_summarize_samples_para)
+def run_miso_compare_samples(infile, outfile, anotion, sample_ids):
+    para = {'anotion':anotion, 'id_one':sample_ids[0], 'id_two':sample_ids[1], 'id_all': id_all}
+    run_cmd("run_miso.py --compare-samples %(id_one)s_miso/%(anotion)s %(id_two)s_miso/%(anotion)s %(id_all)s_miso_comparisons/" % para)
+    flag_dir = '%s_miso_comparisons/complete_flag' % id_all
+    if not path(flag_dir).exists():
+        path(flag_dir).mkdir()
     open(outfile, 'w')
 
-@transform(run_miso_compare_samples)
-def filter(infile, outfile):
-    run_cmd()
+@transform(run_miso_compare_samples, suffix('.compare_complete'), '.compare_addtype_complete')
+def compare_add_type(infile, outfile):
+    anotion = infile.split('.')[-2]
+    para = {'id_all':id_all, 'anotion':anotion}
+    run_cmd("perl /home/sgguo/script/add_type.pl %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf %(anotion)s %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add" % para)
+    if anotion=='SE':
+        run_cmd('head -1 %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add > %(id_all)s_miso_comparisons/header.txt' % para)
+    run_cmd("sed -i 1d %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add" % para)
 
-exce_task = eval(args.task)
+@transform(run_miso_compare_samples, suffix('.compare_complete'), '.filter_events_complete')
+def filter_events(infile, outfile):
+    anotion = infile.split('.')[-2]
+    para = {'id_all':id_all, 'anotion':anotion}
+    run_cmd("filter_events.py --filter %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf  --num-inc 1 --num-exc 1 --num-sum-inc-exc 10 --delta-psi 0.20 --bayes-factor 10 --output-dir %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/" % para)
+
+@transform(filter_events, suffix('.filter_events_complete'), '.filter_add_type_complete')
+def filter_add_type(infile, outfile):
+    anotion = infile.split('.')[-2]
+    para = {'id_all':id_all, 'anotion':anotion}
+    run_cmd("perl script/add_type.pl %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered %(anotion)s %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered_add" % para)
+    run_cmd("sed -i 1d %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered_add" % para)
+    open(outfile, 'w')
+
+@follows(compare_add_type)
+@files('%s_miso_comparisons/complete_flag/flag.%s.SE.compare_complete' % (id_all, id_all), '%s_miso_comparisons/s1.vs.s2.all_events.bf' % id_all)
+def merge_compare_add_type(infile, outfile):
+    run_cmd("cat %(id_all)s_miso_comparisons/*/*/*.miso_bf_add > " % {'id_all':id_all})
+
+@follows(filter_add_type)
+@files('%s_miso_comparisons/complete_flag/flag.%s.SE.filter_add_type_complete' % (id_all, id_all), '%s_miso_comparisons/s1.vs.s2.filter_all_events.bf' % id_all)
+def merge_filter_add_type(infile, outfile):
+    run_cmd("cat %s_miso_comparisons/*/*/*.miso_bf.filtered_add > %s" % (id_all, outfile))
+
+
+@transform(merge_filter_add_type, regex(r's1.vs.s2.filter_all_events.bf$'), 'raw_events.tsv')
+def raw_events_tsv(infile, outfile):
+    run_cmd('perl add_pairwise.pl %s s1_vs_s2 %s' % (infile, outfile))
+    run_cmd("sed -i 1i'group    type    event_name  sample1_posterior_mean  sample1_ci_low  sample1_ci_high sample2_posterior_mean  sample2_ci_low  sample2_ci_high diff    bayes_factor    isoforms    sample1_counts  sample1_assigned_counts sample2_counts  sample2_assigned_counts chrom   strand  mRNA_starts mRNA_ends' %s" % outfile)
+
+# exce_task = eval(args.task)
+# exce_tasks = [exce_task]
+exce_tasks = [raw_events_tsv, merge_compare_add_type, merge_summary]
 
 if args.just_print:
-    pipeline_printout(sys.stdout, [exce_task], verbose=args.verbose)
+    pipeline_printout(sys.stdout, exce_tasks, verbose=args.verbose)
 elif args.flowchart:
     # use file extension for output format
     output_format = os.path.splitext(args.flowchart)[1][1:]
     pipeline_printout_graph (open(args.flowchart, "w"),
                              output_format,
-                             [exce_task],
+                             exce_tasks,
                              no_key_legend = True)
     os.system('eog %s' % args.flowchart)
 else:
-    pipeline_run([exce_task],  multiprocess = args.jobs,
+    pipeline_run(exce_tasks,  multiprocess = args.jobs,
                         logger = logger, verbose=args.verbose)
 

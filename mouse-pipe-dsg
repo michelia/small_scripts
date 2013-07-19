@@ -151,6 +151,11 @@ def compare_sample(infile, outfile, anotion, id1, id2):
     run_cmd("run_miso.py --compare-samples %(id_one)s_miso/%(anotion)s %(id_two)s_miso/%(anotion)s %(id_all)s_miso_comparisons/%(anotion)s" % anotion_name)
     open(outfile, 'w')
 
+@follows(compare_sample)
+@files()
+def compare_add_type()
+
+
 
 # exce_task = [eval(args.task), stat_sam]
 # exce_task = [merge_summay, compare_sample]
