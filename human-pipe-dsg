@@ -6,14 +6,13 @@ from ruffus import *
 import logging
 from michelia import path, run_cmd
 
-
 parser = argparse.ArgumentParser(description='''
             dsg_pipe_human.py "{'L374N': 115, 'L374T': 115}" -j 20 -p
             ''')
 
-parser.add_argument('task', metavar='task',
-                # choices=['modify_bam_index', 'miso_summarize', 'merge_summary', 'compare_sample', 'generate_result'],
-                help='选择要执行的任务')
+# parser.add_argument('task', metavar='task',
+#             choices=['modify_bam_index', 'miso_summarize', 'merge_summary', 'compare_sample', 'generate_result'],
+#             help='选择要执行的任务')
 parser.add_argument('insert_size', type=int, help='插入片段长度')
 parser.add_argument('sample_id_length', type=str,
                     help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
@@ -33,7 +32,7 @@ parser.add_argument("--flowchart", dest="flowchart",
                     type=str,
                     help="Print flowchart of the pipeline to FILE. Flowchart format "
                        "depends on extension. Alternatives include ('.dot', '.jpg', "
-                       "'*.svg', '*.png' etc). Formats other than '.dot' require "
+                       "'*.svg', '*.png' ,'.pdf' etc). Formats other than '.dot' require "
                        "the dot program to be installed (http://www.graphviz.org/).")
 parser.add_argument("-n", "--just_print", dest="just_print",
                     action="store_true", default=False,
@@ -203,7 +202,7 @@ def raw_events_tsv(infile, outfile):
 
 # exce_task = eval(args.task)
 # exce_tasks = [exce_task]
-exce_tasks = [raw_events_tsv, merge_compare_add_type, merge_summary]
+exce_tasks = [raw_events_tsv, merge_compare_add_type, merge_summary]  # 这是运行所有的模块
 
 if args.just_print:
     pipeline_printout(sys.stdout, exce_tasks, verbose=args.verbose)
