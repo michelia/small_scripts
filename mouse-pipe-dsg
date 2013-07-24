@@ -193,15 +193,73 @@ def merge_filter_add_type(infile, outfile):
 @transform(merge_filter_add_type, regex(r'.filter_all_events.bf$'), '_raw_events.tsv')
 def raw_events_tsv(infile, outfile):
     run_cmd('perl /home/sgguo/script/add_pairwise.pl %s %s %s' % (infile, id_all, outfile))
-    run_cmd("sed -i 1i'group    type    event_name  sample1_posterior_mean  sample1_ci_low  sample1_ci_high sample2_posterior_mean  sample2_ci_low  sample2_ci_high diff    bayes_factor    isoforms    sample1_counts  sample1_assigned_counts sample2_counts  sample2_assigned_counts chrom   strand  mRNA_starts mRNA_ends' %s" % outfile)
+    # 注意下面插入的 制表符 分割的一行,  不能复制在粘贴
+    run_cmd("sed -i 1i'group	type	event_name	sample1_posterior_mean	sample1_ci_low	sample1_ci_high	sample2_posterior_mean	sample2_ci_low	sample2_ci_high	diff	bayes_factor	isoforms	sample1_counts	sample1_assigned_counts	sample2_counts	sample2_assigned_counts	chrom	strand	mRNA_starts	mRNA_ends' %s" % outfile)
+
+@follows(raw_events_tsv)
+@files('%s_miso_comparisons/%s_raw_events.tsv' % (id_all, id_all), '%s_miso_comparisons/dsg-result/dsg_list.tsv' % id_all)
+def generate_dsg_list_tsv(infile, outfile):
+    dsg_result_dir = path('%s_miso_comparisons/dsg-result' % id_all)
+    if not dsg_result_dir.exists():
+        dsg_result_dir.mkdir()
+    run_cmd('Rscript /home/sgguo/python/R_bin/generate_dsg_list_tsv.R %s %s %s_miso_comparisons/dsg-result/dsg_list_furtherfiltered.tsv /home/sgguo/database/mouse/mouse_event2gene_ref_0.4above.txt' % (infile , outfile , id_all))
 
 
+@follows(run_miso_compare_samples)
+@files('%(id_all)s_miso_comparisons/complete_flag/flag.%(id_all)s.SE.compare_complete' % {'id_all': id_all}, '%s_miso_comparisons/complete_flag/flag.%s.ln_bamfiles_complete' % (id_all, id_all))
+def ln_bamfiles(infile, outfile):
+    bam_dir = path('%s_miso_comparisons/dsg-result/bam' % id_all)
+    if not bam_dir.exists():
+        bam_dir.makedirs()
+    for sample_id in sample_ids:
+        para = {'id': sample_id, 'id_all': id_all, 'pwd': str(path('./').abspath())}
+        run_cmd('ln -s %(pwd)s/%(id)s_bam/accepted_hits_modify.bam %(id_all)s_miso_comparisons/dsg-result/bam/%(id)s.bam' % para)
+        run_cmd('ln -s %(pwd)s/%(id)s_bam/accepted_hits_modify.bam.bai %(id_all)s_miso_comparisons/dsg-result/bam/%(id)s.bam.bai' % para)
+    open(outfile, 'w')
+
+@transform(ln_bamfiles, suffix('.ln_bamfiles_complete'), '.generate_setfile_complete')
+def generate_setfile(infile, outfile):
+    setfile = open('%s_miso_comparisons/dsg-result/plot_settings.txt' % id_all, 'w')
+    para = {'id_one': sample_ids[0], 'id_two':sample_ids[1], 'id_all': id_all}
+    config = ConfigParser.ConfigParser()
+    configfile = open('/software/Python/Python274/lib/python2.7/site-packages/misopy/settings/sashimi_plot_settings.txt', 'r')
+    config.readfp(configfile)
+    # bam_prefix =
+    config.set('data', 'bam_prefix', '%(id_all)s_miso_comparisons/dsg-result/bam/' % para)
+    config.set('data', 'miso_prefix', './')
+    config.set('data', 'bam_files', "['%(id_one)s.bam', '%(id_two)s.bam']" % para)
+    miso_files = []
+    for anotion in anotions:
+        miso_files.append('%s_miao/%s/' % (sample_ids[0], anotion))
+        miso_files.append('%s_miao/%s/' % (sample_ids[1], anotion))
+    config.set('data', 'miso_files', str(miso_files))
+    config.set('plotting', 'coverages', "[%s, %s]" % (sample_map_read_num[sample_ids[0]], sample_map_read_num[sample_ids[1]]))
+    colors = eval(config.get('plotting', 'colors'))
+    config.set('plotting', 'colors', str(colors[0:4:2]))
+
+    config.write(setfile)
+    setfile.close()
+    open(outfile, 'w')
 
 
+sashimi_plots_para = []
+for anotion in anotions:
+    one = []
+    one.append('%s_miso_comparisons/complete_flag/flag.%s.generate_setfile_complete' % (id_all, id_all))
+    one.append('%s_miso_comparisons/complete_flag/flag.%s.%s.sashimi_plots_complete' % (id_all, id_all, anotion))
+    sashimi_plots_para.append(one)
 
-# exce_tasks = [eval(args.task), stat_sam]
-# exce_tasks = [merge_summary, compare_sample]
-exce_tasks = [raw_events_tsv, merge_compare_add_type, merge_summary]  # 这是运行所有的模块
+@follows(generate_dsg_list_tsv, generate_setfile)
+@files(sashimi_plots_para)
+def sashimi_plots(infile, outfile):
+    anotion = outfile.split('.')[-2]
+    run_cmd('perl /home/sgguo/script/sashimi_plots.pl %(id_all)s_miso_comparisons/dsg-result/dsg_list.tsv /home/sgguo/database/mouse/mm10-miso-index/%(anotion)s %(id_all)s_miso_comparisons/dsg-result/sashimi_plots %(id_all)s_miso_comparisons/dsg-result/plot_settings.txt %(anotion)s' % {'id_all': id_all, 'anotion': anotion})
+    open(outfile, 'w')
+
+
+# exce_task = eval(args.task)
+# exce_tasks = [exce_task]
+exce_tasks = [merge_compare_add_type, merge_summary, sashimi_plots]  # 这是运行所有的模块
 # exce_tasks = [merge_summary]
 
 if args.just_print:
