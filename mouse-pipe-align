@@ -160,19 +160,19 @@ def test(infile, outfile):
     print infile
     print outfile
 
-exce_task = [eval(args.task), stat_sam]
+exce_tasks = [eval(args.task), stat_sam]
 
 if args.just_print:
-    pipeline_printout(sys.stdout, exce_task, verbose=args.verbose)
+    pipeline_printout(sys.stdout, exce_tasks, verbose=args.verbose)
 elif args.flowchart:
     # use file extension for output format
     output_format = os.path.splitext(args.flowchart)[1][1:]
     pipeline_printout_graph (open(args.flowchart, "w"),
                              output_format,
-                             exce_task,
+                             exce_tasks,
                              no_key_legend = True)
     os.system('eog %s' % args.flowchart)
 else:
-    pipeline_run(exce_task,  multiprocess = args.jobs,
+    pipeline_run(exce_tasks,  multiprocess = args.jobs,
                         logger = logger, verbose=args.verbose)
 

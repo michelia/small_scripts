@@ -8,7 +8,7 @@ from michelia import path, run_cmd, path
 
 
 parser = argparse.ArgumentParser(description='''
-            mouse-pipe-dsg 200 "{'sG762': 90, 'sN106': 90}" -n
+            mouse-pipe-deg 200 "{'sG762': 90, 'sN106': 90}" -n
             ''')
 
 # parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
@@ -194,7 +194,52 @@ def merge_filter_add_type(infile, outfile):
 def raw_events_tsv(infile, outfile):
     run_cmd('perl /home/sgguo/script/add_pairwise.pl %s %s %s' % (infile, id_all, outfile))
     run_cmd("sed -i 1i'group    type    event_name  sample1_posterior_mean  sample1_ci_low  sample1_ci_high sample2_posterior_mean  sample2_ci_low  sample2_ci_high diff    bayes_factor    isoforms    sample1_counts  sample1_assigned_counts sample2_counts  sample2_assigned_counts chrom   strand  mRNA_starts mRNA_ends' %s" % outfile)
+# @follows(compare_sample)
+# @files()
+# def compare_add_type()
 
+# 999999999999999999999999999999999999999999999999999999999999
+
+
+# @transform(run_miso_compare_samples, suffix('.compare_complete'), '.compare_addtype_complete')
+# def compare_add_type(infile, outfile):
+#     anotion = infile.split('.')[-2]
+#     para = {'id_all':id_all, 'anotion':anotion}
+#     run_cmd("perl /home/sgguo/script/add_type.pl %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf %(anotion)s %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add" % para)
+#     if anotion=='SE':
+#         run_cmd('head -1 %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add > %(id_all)s_miso_comparisons/header.txt' % para)
+#     run_cmd("sed -i 1d %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf_add" % para)
+
+# @transform(run_miso_compare_samples, suffix('.compare_complete'), '.filter_events_complete')
+# def filter_events(infile, outfile):
+#     anotion = infile.split('.')[-2]
+#     para = {'id_all':id_all, 'anotion':anotion}
+#     run_cmd("filter_events.py --filter %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf  --num-inc 1 --num-exc 1 --num-sum-inc-exc 10 --delta-psi 0.20 --bayes-factor 10 --output-dir %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/" % para)
+
+# @transform(filter_events, suffix('.filter_events_complete'), '.filter_add_type_complete')
+# def filter_add_type(infile, outfile):
+#     anotion = infile.split('.')[-2]
+#     para = {'id_all':id_all, 'anotion':anotion}
+#     run_cmd("perl script/add_type.pl %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered %(anotion)s %(id_all)s_miso_comparisons/%(anotion)s/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered_add" % para)
+#     run_cmd("sed -i 1d %(id_all)s_miso_comparisons/%(anotion)s_vs_%(anotion)s/bayes-factors/%(anotion)s_vs_%(anotion)s.miso_bf.filtered_add" % para)
+#     open(outfile, 'w')
+
+# @follows(compare_add_type)
+# @files('%s_miso_comparisons/complete_flag/flag.%s.SE.compare_complete' % (id_all, id_all), '%s_miso_comparisons/%s.all_events.bf' % (id_all, id_all))
+# def merge_compare_add_type(infile, outfile):
+#     run_cmd("cat %(id_all)s_miso_comparisons/*/*/*.miso_bf_add > " % {'id_all':id_all})
+
+# @follows(filter_add_type)
+# @files('%s_miso_comparisons/complete_flag/flag.%s.SE.filter_add_type_complete' % (id_all, id_all), '%s_miso_comparisons/%s.filter_all_events.bf' % (id_all, id_all))
+# def merge_filter_add_type(infile, outfile):
+#     run_cmd("cat %s_miso_comparisons/*/*/*.miso_bf.filtered_add > %s" % (id_all, outfile))
+
+
+# @transform(merge_filter_add_type, regex(r'.filter_all_events.bf$'), '_raw_events.tsv')
+# def raw_events_tsv(infile, outfile):
+#     run_cmd('perl add_pairwise.pl %s s1_vs_s2 %s' % (infile, outfile))
+#     run_cmd("sed -i 1i'group    type    event_name  sample1_posterior_mean  sample1_ci_low  sample1_ci_high sample2_posterior_mean  sample2_ci_low  sample2_ci_high diff    bayes_factor    isoforms    sample1_counts  sample1_assigned_counts sample2_counts  sample2_assigned_counts chrom   strand  mRNA_starts mRNA_ends' %s" % outfile)
+# 999999999999999999999999999999999999999999999999999999999999
 
 
 
