@@ -7,7 +7,8 @@ from michelia import path, run_cmd
 from ruffus import *
 
 parser = argparse.ArgumentParser(description='''
-            human-pipe-dsg 200 "{'L374N': 115, 'L374T': 115}" "{'L374N': 39548755, 'L374T': 38271678}" -n
+            human-pipe-dsg 200 "{'L374N': 115, 'L374T': 115}" "{'L374N': 39548755, 'L374T': 38271678}"
+            这是人差异剪接的流程
             ''')
 
 # parser.add_argument('task', metavar='task',

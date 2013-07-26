@@ -8,7 +8,8 @@ from michelia import path, run_cmd
 
 
 parser = argparse.ArgumentParser(description='''
-            mouse-pipe-align "{'L374N': 115, 'L374T': 115}" -j 20 -p
+            mouse-pipe-align "{'L374N': 115, 'L374T': 115}"
+            这是mouse的比对和差异表达的pipeline
             ''')
 
 # parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')

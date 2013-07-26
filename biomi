@@ -106,14 +106,14 @@ def main():
     id_convert_trimParse.add_argument('-l', type=int, metavar='Last', help='Last base to keep. Default is entire read.如当 -l 150 时， 有的序列长度未达到150, 则原样输出; 大于150的read 截取到 150')  #默认的值是 None
     id_convert_trimParse.set_defaults(func=id_convert_trim)
 
-    modify_samParse = subparsers.add_parser('modifysam', help='在染色体上的位置加上 chr, 只是对人的 human',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent('''
-            在染色体上的位置加上 chr, 这是为了处理平台的产生bam/sam格式的缺陷
-            '''))
-    modify_samParse.add_argument('insam', help='输入的fastq文件')
-    modify_samParse.add_argument('tosam', help='save out to outfq')
-    modify_samParse.set_defaults(func=modify_sam)
+    # modify_samParse = subparsers.add_parser('modifysam', help='在染色体上的位置加上 chr, 只是对人的 human',
+    #     formatter_class=argparse.RawDescriptionHelpFormatter,
+    #     description=textwrap.dedent('''
+    #         在染色体上的位置加上 chr, 这是为了处理平台的产生bam/sam格式的缺陷
+    #         '''))
+    # modify_samParse.add_argument('insam', help='输入的fastq文件')
+    # modify_samParse.add_argument('tosam', help='save out to outfq')
+    # modify_samParse.set_defaults(func=modify_sam)
 
     modify_bamParse = subparsers.add_parser('modifybam', help='在染色体上的位置加上 chr, 只是对人的 human',
         formatter_class=argparse.RawDescriptionHelpFormatter,

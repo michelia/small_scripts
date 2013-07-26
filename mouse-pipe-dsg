@@ -7,9 +7,10 @@ import logging
 from michelia import path, run_cmd, path
 
 
-parser = argparse.ArgumentParser(description='''
-            mouse-pipe-dsg 200 "{'sG762': 90, 'sN106': 90}" -n
-            ''')
+parser = argparse.ArgumentParser(description=textwrap.dedent('''
+        mouse-pipe-dsg 200 "{'sG762': 90, 'sN106': 90}" -n
+        这是小鼠差异剪接的pipeline, 使用前请先执行mouse-pipe-align-deg 的align部分
+            '''))
 
 # parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
 parser.add_argument('insert_size', type=int, help='插入片段长度')

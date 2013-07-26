@@ -10,13 +10,14 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 def main():
     function = '把sam/bam文件转换为fastq文件'
-    parse = argparse.ArgumentParser(#prog='qiime_pipline', 
+    parse = argparse.ArgumentParser(#prog='qiime_pipline',
         description=function)
-    parse.add_argument('samFile')
-    parse.add_argument('toDir')
+    parse.add_argument('samFile', help='sam/bam file')
+    parse.add_argument('tofastq')
     # parse.add_argument('toFormat')
     args = parse.parse_args()
-    toFile = '%s/%s.fastq' % (args.toDir, path(args.samFile).namebase)
+    # toFile = '%s/%s.fastq' % (args.toDir, path(args.samFile).namebase)
+    toFile = args.tofastq
     samfile = pysam.Samfile(args.samFile)
     output = open(toFile, 'w')
     for aread in samfile:
