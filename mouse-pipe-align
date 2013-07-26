@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='''
             mouse-pipe-align "{'L374N': 115, 'L374T': 115}" -j 20 -p
             ''')
 
-parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
+# parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
 parser.add_argument('insert_size', type=int, help='插入片段长度')
 parser.add_argument('sample_id_length', type=str,
                     help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
@@ -20,7 +20,7 @@ parser.add_argument('-v', '--verbose', dest='verbose',
         help="Print more detailed messages for each additional verbose level. E.g. run_parallel_blast --verbose --verbose --verbose ... (or -vvv)")
 
 parser.add_argument("-j", "--jobs", dest="jobs",
-                    default=8,
+                    default=4,
                     metavar="jobs",
                     type=int,
                     help="Specifies the number of jobs (operations) to run in parallel.")
@@ -104,6 +104,12 @@ def dna_tophat_align(infile, outfile, sample_id):
     dict_para = {'fastqone':infile, 'sample_id': sample_id}
     run_cmd('tophat2 -o %(sample_id)s_dna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/dna/Mus_musculus.GRCm38.71.dna %(fastqone)s ../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
 
+@transform(dna_tophat_align, suffix('.bam'), '.wig')
+def bam_to_wig(infile, outfile):
+    wigsam = outfile.replace('.wig', '_coverage.sam')
+    run_cmd('mkfifo %s' % wigsam)
+    run_cmd('samtools view %s > %s | wiggles %s %s' % (infile, wigsam, wigsam, outfile))
+
 @transform(dna_tophat_align, suffix('.bam'), '.sam')
 def bam_index_tosam(infile, outfile):
     # dna bam index and to sam
@@ -160,7 +166,8 @@ def test(infile, outfile):
     print infile
     print outfile
 
-exce_tasks = [eval(args.task), stat_sam]
+# exce_tasks = [eval(args.task), stat_sam]
+exce_tasks = [bam_to_wig]
 
 if args.just_print:
     pipeline_printout(sys.stdout, exce_tasks, verbose=args.verbose)

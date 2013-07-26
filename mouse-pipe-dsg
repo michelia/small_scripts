@@ -193,8 +193,7 @@ def merge_filter_add_type(infile, outfile):
 @transform(merge_filter_add_type, regex(r'.filter_all_events.bf$'), '_raw_events.tsv')
 def raw_events_tsv(infile, outfile):
     run_cmd('perl /home/sgguo/script/add_pairwise.pl %s %s %s' % (infile, id_all, outfile))
-    # 注意下面插入的 制表符 分割的一行,  不能复制在粘贴
-    run_cmd("sed -i 1i'group	type	event_name	sample1_posterior_mean	sample1_ci_low	sample1_ci_high	sample2_posterior_mean	sample2_ci_low	sample2_ci_high	diff	bayes_factor	isoforms	sample1_counts	sample1_assigned_counts	sample2_counts	sample2_assigned_counts	chrom	strand	mRNA_starts	mRNA_ends' %s" % outfile)
+    run_cmd("sed -i 1i'group\ttype\tevent_name\tsample1_posterior_mean\tsample1_ci_low\tsample1_ci_high\tsample2_posterior_mean\tsample2_ci_low\tsample2_ci_high\tdiff\tbayes_factor\tisoforms\tsample1_counts\tsample1_assigned_counts\tsample2_counts\tsample2_assigned_counts\tchrom\tstrand\tmRNA_starts\tmRNA_ends' %s" % outfile)
 
 @follows(raw_events_tsv)
 @files('%s_miso_comparisons/%s_raw_events.tsv' % (id_all, id_all), '%s_miso_comparisons/dsg-result/dsg_list.tsv' % id_all)
