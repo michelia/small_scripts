@@ -96,7 +96,7 @@ for sample_id in sample_ids:
 @files(run_events_analysis_para)
 def run_events_analysis(infile, outfile, length, outdir, anotion, sample_id):
     '''infile is the bam file, outfile is a complete flag file'''
-    run_cmd("run_events_analysis.py --compute-genes-psi /home/sgguo/database/mouse/mm10-miso-index/%s %s --output-dir %s --read-len %s -p 6" % (anotion, infile, outdir, length))
+    run_cmd("run_events_analysis.py --compute-genes-psi /home/sgguo/database/mouse/mm10-miso-index/%s %s --output-dir %s --read-len %s -p 6 --settings-filename=/software/Python/Python274/lib/python2.7/site-packages/misopy/settings/miso_settings.txt" % (anotion, infile, outdir, length))
     flagdir = '%s_miso/complete_flag' % sample_id
     if not path(flagdir).exists():
         path(flagdir).mkdir()
