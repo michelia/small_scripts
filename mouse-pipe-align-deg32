@@ -1,0 +1,178 @@
+#!/usr/bin/env python
+#encoding=utf8
+
+import os, sys, argparse, textwrap
+from ruffus import *
+import logging
+from michelia import path, run_cmd
+
+
+parser = argparse.ArgumentParser(description='''
+            mouse-pipe-align "{'L374N': 115, 'L374T': 115}"
+            这是mouse的比对和差异表达的pipeline
+            ''')
+
+# parser.add_argument('task', metavar='task', choices=['plot', 'test', 'deg_cuffdiff', 'cov_plot'], help='选择要执行的任务')
+parser.add_argument('insert_size', type=int, help='插入片段长度')
+parser.add_argument('sample_id_length', type=str,
+                    help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
+parser.add_argument('-v', '--verbose', dest='verbose',
+        action="count", default=3,
+        help="Print more detailed messages for each additional verbose level. E.g. run_parallel_blast --verbose --verbose --verbose ... (or -vvv)")
+
+parser.add_argument("-j", "--jobs", dest="jobs",
+                    default=4,
+                    metavar="jobs",
+                    type=int,
+                    help="Specifies the number of jobs (operations) to run in parallel.")
+
+parser.add_argument("--flowchart", dest="flowchart",
+                    metavar="FILE",
+                    type=str,
+                    help="Print flowchart of the pipeline to FILE. Flowchart format "
+                       "depends on extension. Alternatives include ('.dot', '.jpg', "
+                       "'*.svg', '*.png' etc). Formats other than '.dot' require "
+                       "the dot program to be installed (http://www.graphviz.org/).")
+parser.add_argument("-n", "--just_print", dest="just_print",
+                    action="store_true", default=False,
+                    help="Only print a trace (description) of the pipeline. "
+                         " The level of detail is set by --verbose.")
+args = parser.parse_args()
+
+if len(sys.argv)==1:
+    parser.parse_args(['-h'])
+
+
+#88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
+
+#   Logger
+
+logger = logging.getLogger("run_parallel_blast")
+#
+# We are interesting in all messages
+#
+if args.verbose:
+    logger.setLevel(logging.DEBUG)
+    stderrhandler = logging.StreamHandler(sys.stderr)
+    stderrhandler.setFormatter(logging.Formatter("    %(message)s"))
+    stderrhandler.setLevel(logging.DEBUG)
+    logger.addHandler(stderrhandler)
+
+
+#88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
+#   Pipeline tasks
+
+
+# samples_length = {'L374N': 115, 'L374T': 115}   #, 'L444N': 104, 'L444T': 104, 'L550N': 104, 'L550T': 104}
+samples_length = eval(args.sample_id_length)
+if type(samples_length) != dict:
+    raise Exception('sample_id_length的格式不对')
+
+sample_ids = samples_length.keys()  # sample_ids = ['L374N', 'L374T']
+# id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
+sample_ids_name = []  # [['n'], ['t']]
+for sample_id in sample_ids:
+    sample_ids_name.append([sample_id])
+
+dna_tophat_align_files = []
+for sample_id in sample_ids:
+    file_list = []
+    file_list.append('../fastq64/%sr1.fastq-illumina' % sample_id)
+    file_list.append('%s_dna_align/accepted_hits.bam' % sample_id)
+    file_list.append(sample_id)
+    dna_tophat_align_files.append(file_list)
+
+cdna_tophat_align_files = []
+for sample_id in sample_ids:
+    file_list = []
+    file_list.append('../fastq64/%sr1.fastq-illumina' % sample_id)
+    file_list.append('%s_cdna_align/accepted_hits.bam' % sample_id)
+    file_list.append(sample_id)
+    cdna_tophat_align_files.append(file_list)
+
+
+# @follows(para_deal)
+@files(dna_tophat_align_files)
+def dna_tophat_align(infile, outfile, sample_id):
+    dict_para = {'fastqone':infile, 'sample_id': sample_id}
+    run_cmd('tophat2 -o %(sample_id)s_dna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/dna/Mus_musculus.GRCm38.71.dna %(fastqone)s ../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
+
+@transform(dna_tophat_align, suffix('.bam'), '.wig')
+def bam_to_wig(infile, outfile):
+    wigsam = outfile.replace('.wig', '_coverage.sam')
+    run_cmd('mkfifo %s' % wigsam)
+    run_cmd('samtools view %s > %s | wiggles %s %s' % (infile, wigsam, wigsam, outfile))
+
+@transform(dna_tophat_align, suffix('.bam'), '.sam')
+def bam_index_tosam(infile, outfile):
+    # dna bam index and to sam
+    run_cmd('samtools index %s' % infile)
+    run_cmd('samtools view -h %s > %s' % (infile, outfile))
+
+@transform(bam_index_tosam, suffix('.sam'), '.stat')
+def stat_sam(infile, outfile):
+    # dna sam stat
+    run_cmd('perl /home/sgguo/script/parse_sam_v1.3.pl %s > %s' % (infile, outfile))
+
+
+# @follows(para_deal)
+@files(cdna_tophat_align_files)
+def cdna_tophat_align(infile, outfile, sample_id):
+    dict_para = {'fastqone':infile, 'sample_id': sample_id}
+    run_cmd('tophat2 -o %(sample_id)s_cdna_align -g 1 -p 6 -r 30 --phred64-quals --library-type fr-unstranded /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all %(fastqone)s ../fastq64/%(sample_id)sr2.fastq-illumina' % dict_para)
+
+@transform(cdna_tophat_align, suffix('.bam'), '.dep')
+def bam_depth(infile, outfile):
+    # cdna bam depth
+    run_cmd('samtools depth %s > %s' % (infile, outfile))
+
+@follows(bam_depth)
+@transform(bam_depth, suffix('.dep'), '.cov')
+def reads_coverage(infile, outfile):
+    run_cmd('perl /home/sgguo/script/reads_coverage.v2.0.pl /home/sgguo/database/mouse/cdna/Mus_musculus.GRCm38.71.cdna.all.fa.len %s %s 100 300' % (infile, outfile))
+
+# @follows(stat_sam, bam_depth)
+@transform(reads_coverage, regex(r'accepted_hits.cov'), 'gene_cov.pdf')
+def cov_plot(infile, outfile):
+    run_cmd('Rscript /home/sgguo/script/cov_plot_v2.3.R %s %s %s' % (infile, args.insert_size, outfile))
+
+def make_data_info(sample_ids, info_file):
+    data_info = open(info_file, 'w')
+    data_info.write('sample_' + '\tsample_'.join(map(str,range(1, len(sample_ids)+1))) +'\n')
+    data_info.write('\t'.join(sample_ids) + '\n')
+    data_info.close()
+
+@merge(cdna_tophat_align, None)
+def deg_cuffdiff(infiles, outfile):
+    bams = ' '.join(sorted(infiles))
+    run_cmd('cuffdiff -o ../deg_cuffdiff -L s1,s2 -u -p 6 --library-type fr-unstranded --dispersion-method pooled --library-norm-method geometric -m %s -s 50 /home/sgguo/database/mouse/Mus_musculus.GRCm38.71.gtf %s' % (args.insert_size, bams))
+
+@follows(deg_cuffdiff)
+@files('../deg_cuffdiff/genes.fpkm_tracking', '../deg_plots/')
+def deg_plots(infile, outfile):
+    make_data_info(sample_ids, '../deg_plots/data_info')
+    run_cmd('Rscript /home/sgguo/script/deg_plots.R ../deg_cuffdiff/ ../deg_plots ../data_info 0.05 1 s')
+
+
+@merge(['infile1', 'infile2'], None)
+def test(infile, outfile):
+    print infile
+    print outfile
+
+# exce_tasks = [eval(args.task), stat_sam]
+exce_tasks = [bam_to_wig]
+
+if args.just_print:
+    pipeline_printout(sys.stdout, exce_tasks, verbose=args.verbose)
+elif args.flowchart:
+    # use file extension for output format
+    output_format = os.path.splitext(args.flowchart)[1][1:]
+    pipeline_printout_graph (open(args.flowchart, "w"),
+                             output_format,
+                             exce_tasks,
+                             no_key_legend = True)
+    os.system('eog %s' % args.flowchart)
+else:
+    pipeline_run(exce_tasks,  multiprocess = args.jobs,
+                        logger = logger, verbose=args.verbose)
+
