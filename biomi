@@ -3,7 +3,7 @@
 
 import argparse , sys, textwrap, datetime
 
-from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert, qualave, id_convert_trim #, sam2fastq
+from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert, qualave, id_convert_trim, pe_fastq_extract #, sam2fastq
 from biomi_lib import modify_sam, modify_bam
 
 def main():
@@ -79,8 +79,10 @@ def main():
     fq_id_convertParse = subparsers.add_parser('fq_id_convert', help='把格式2类型id转换成格式1型, 因为格式1常用',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''
-            把格式2类型id转换成格式1型,因为格式1常用(没有空格)
+            把格式2类型id转换成格式1型,因为格式1常用(没有空格), 不考虑质量值的问题
+            输入支持gz压缩, 输出不支持
             E..g: biomi fq_id_convert example.fastq tosave.fastq
+            E..g: biomi fq_id_convert example.fastq.gz tosave.fastq
             输入的可以是gz压缩的文件, 但输出的不是压缩文件
             '''))
     fq_id_convertParse.add_argument('infq', help='输入的fastq文件')
@@ -94,16 +96,19 @@ def main():
         功能:
             fastq id转换
             fastq 32或64位转换
-            trim fastq read
-            所以文件格式是fastq
+            trim fastq read 默认不截取
+            所以文件格式是fastq类文件
+            输入的可以是gz压缩的文件, 输出的不支持
+            biomi id_convert_trim example.fastq.gz fastq tosave.fastq fastq-illumina
+            biomi id_convert_trim example.fastq.gz fastq tosave.fastq fastq-illumina -f 5 -l 95
             '''))
     id_convert_trimParse.add_argument('infile',help='the inputfile')
     id_convert_trimParse.add_argument('format', help='the format of inputfile')
     id_convert_trimParse.add_argument('tofile', help='the outfile path, 注意是输出文件名')
     id_convert_trimParse.add_argument('toFormat', help='the format of outfile')
-    id_convert_trimParse.add_argument('--id_convert', action='store_true', help='把格式2id转换成格式1,因为格式1常用(没有空格)')
-    id_convert_trimParse.add_argument('-f', type=int, default=1, metavar='First',help='First base to keep. Default is 1 (=first base).')
-    id_convert_trimParse.add_argument('-l', type=int, metavar='Last', help='Last base to keep. Default is entire read.如当 -l 150 时， 有的序列长度未达到150, 则原样输出; 大于150的read 截取到 150')  #默认的值是 None
+    id_convert_trimParse.add_argument('--id_convert', action='store_true', help='fastq id 格式转换:把格式2id转换成格式1,因为格式1常用(没有空格)')
+    id_convert_trimParse.add_argument('-f', type=int, default=1, metavar='First',help='First base to keep. Default is 1 (=first base). 默认不截取')
+    id_convert_trimParse.add_argument('-l', type=int, metavar='Last', help='Last base to keep. Default is entire read.如当 -l 150 时， 有的序列长度未达到150, 则原样输出; 大于150的read 截取到 150. 默认不截取')  #默认的值是 None
     id_convert_trimParse.set_defaults(func=id_convert_trim)
 
     # modify_samParse = subparsers.add_parser('modifysam', help='在染色体上的位置加上 chr, 只是对人的 human',
@@ -126,6 +131,19 @@ def main():
     modify_bamParse.add_argument('tobam', help='tobam.bam')
     modify_bamParse.set_defaults(func=modify_bam)
 
+    pe_fastq_extractParse = subparsers.add_parser('pe_fastq_extract', help='提取pe_fastq配对的reads',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            提取一对fastqs文件中的num个可以配对的reads, 是以fastq_1的num个配对reads(按字典顺序的前num个)， 然后生成两个新的fastq文件， 每个fastq文件中各包含num个reads
+            此功能暂时只支持fastq文件， 对于fastq-illumina不支持
+            注意fastq文件id格式必须为 格式1; fastq 1 和 2 是分先后顺序的
+            '''))
+    pe_fastq_extractParse.add_argument('fastq1', help='')
+    pe_fastq_extractParse.add_argument('fastq2', help='')
+    pe_fastq_extractParse.add_argument('num', help='提取fastq1文件前num个配对的reads', type=int)
+    pe_fastq_extractParse.add_argument('tofastq1', help='')
+    pe_fastq_extractParse.add_argument('tofastq2', help='')
+    pe_fastq_extractParse.set_defaults(func=pe_fastq_extract)
     # if len(sys.argv)==1:
     #     parser.parse_args(['-h'])
     args = parser.parse_args()
