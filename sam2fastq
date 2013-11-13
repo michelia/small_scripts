@@ -24,7 +24,7 @@ def main():
         title = aread.qname
         seq = aread.seq
         qual = aread.qual
-        line_fmt = "@{0!s}\n{1!s}\n+{0!s}\n{2!s}\n"
+        line_fmt = "@{0!s}\n{1!s}\n+\n{2!s}\n"
         line = line_fmt.format(title, seq, qual)
         output.write(line)
     output.close()

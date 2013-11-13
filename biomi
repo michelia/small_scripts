@@ -3,7 +3,7 @@
 
 import argparse , sys, textwrap, datetime
 
-from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert, qualave, id_convert_trim, pe_fastq_extract #, sam2fastq
+from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert, qualave, id_convert_trim, pe_fastq_extract, blastn, blastn_parse #, sam2fastq
 from biomi_lib import modify_sam, modify_bam
 
 def main():
@@ -56,10 +56,17 @@ def main():
     checkQualParse = subparsers.add_parser('checkqual', help="识别fastq文件的质量值编码(encode offset)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent('''
-            covert sequence data format.
-                E.g: biomi checkQual example.fastq / example.fastq.gz
+                biomi checkQual example.fastq
+                暂时实现多个文件的方法是
+                biomi checkQual '*.fastq'
+                biomi checkQual '*'
+                对要加上 字符串 引号
+                已经修改过了，现在可以这样使用了
+                biomi checkQual *.fastq
+                biomi checkQual *
             '''))
-    checkQualParse.add_argument('fastq', help='fastq文件或者是gz压缩的fastq文件')
+    checkQualParse.add_argument('fastq', help='fastq文件或者是gz压缩的fastq文件', nargs='+')
+    checkQualParse.add_argument('-n', dest='reads_num', default=100000, type=int, help='检测reads的数目, 默认是10万条')
     checkQualParse.set_defaults(func=checkQual)
 
     trimQualAveParse = subparsers.add_parser('trimQualAve', help="指定一个qual的平均值, 去掉小于这个平均值的read,输出≥这个平均值的reads",
@@ -144,6 +151,23 @@ def main():
     pe_fastq_extractParse.add_argument('tofastq1', help='')
     pe_fastq_extractParse.add_argument('tofastq2', help='')
     pe_fastq_extractParse.set_defaults(func=pe_fastq_extract)
+
+    blastnParse = subparsers.add_parser('blastn', help='批量进行NCBI blastn',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            批量进行NCBI blastn, 要自建立文件夹
+            '''))
+    blastnParse.add_argument("fafile", help='序列要以fasta格式输入')
+    blastnParse.add_argument("todir", help='存放结果的文件夹')
+    blastnParse.set_defaults(func=blastn)
+
+    blastn_parseParse = subparsers.add_parser('blastn_parse', help='显示每个NCBI blast前n个结果',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=textwrap.dedent('''
+            '''))
+    blastn_parseParse.add_argument("todir", help='批量NCBI blast存放结果的文件夹')
+    blastn_parseParse.add_argument('num', type=int, help='显示前num个结果')
+    blastn_parseParse.set_defaults(func=blastn_parse)
     # if len(sys.argv)==1:
     #     parser.parse_args(['-h'])
     args = parser.parse_args()
