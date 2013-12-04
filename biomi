@@ -4,7 +4,7 @@
 import argparse , sys, textwrap, datetime
 
 from biomi_lib import fconvert, cutseq, checkQual ,fq_id_convert, qualave, id_convert_trim, pe_fastq_extract, blastn, blastn_parse #, sam2fastq
-from biomi_lib import modify_sam, modify_bam
+from biomi_lib import modify_sam
 
 def main():
     function = 'biomi is a python program in bioinformatics.'
@@ -127,16 +127,6 @@ def main():
     # modify_samParse.add_argument('tosam', help='save out to outfq')
     # modify_samParse.set_defaults(func=modify_sam)
 
-    modify_bamParse = subparsers.add_parser('modifybam', help='在染色体上的位置加上 chr, 只是对人的 human',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent('''
-            在染色体上的位置加上 chr, 这是为了处理平台的产生bam格式的缺陷
-            这个程序是 modify_sam 的升级版, 一次解决bam文件问题, 速度更快
-            注意: inbam, tobam 文件后缀名 都是 .bam
-            '''))
-    modify_bamParse.add_argument('inbam', help='inbam.bam')
-    modify_bamParse.add_argument('tobam', help='tobam.bam')
-    modify_bamParse.set_defaults(func=modify_bam)
 
     pe_fastq_extractParse = subparsers.add_parser('pe_fastq_extract', help='提取pe_fastq配对的reads',
         formatter_class=argparse.RawDescriptionHelpFormatter,

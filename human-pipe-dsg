@@ -11,10 +11,6 @@ parser = argparse.ArgumentParser(description='''
             这是人差异剪接的流程
             ''')
 
-# parser.add_argument('task', metavar='task',
-#             choices=['modify_bam_index', 'miso_summarize', 'merge_summary', 'compare_sample', 'generate_result'],
-#             help='选择要执行的任务')
-parser.add_argument('insert_size', type=int, help='插入片段长度')
 parser.add_argument('sample_id_length', type=str,
                     help="这个是样品的必须信息,  包括样品的id 和 样品测序的长度. 格式如: {'L374N': 115, 'L374T': 115}")
 parser.add_argument('sample_map_read_num', type=str,
@@ -29,7 +25,7 @@ parser.add_argument("-j", "--jobs", dest="jobs",
                     type=int,
                     help="Specifies the number of jobs (operations) to run in parallel. default is 4.")
 
-parser.add_argument("--flowchart", dest="flowchart",
+parser.add_argument('-f', "--flowchart", dest="flowchart",
                     metavar="FILE",
                     type=str,
                     help="Print flowchart of the pipeline to FILE. Flowchart format "
@@ -45,8 +41,8 @@ parser.add_argument("-n", "--just_print", dest="just_print",
 #                     help="print run_cmd")
 args = parser.parse_args()
 
-if len(sys.argv)==1:
-    parser.parse_args(['-h'])
+# if len(sys.argv)==1:
+#     parser.parse_args(['-h'])
 
 #88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
 #   Logger
@@ -79,19 +75,19 @@ sample_ids = samples_length.keys()  # sample_ids = ['L374N', 'L374T']
 # id_all = '%s_%s' % tuple(sample_ids)  # L374N_L374T
 id_all = '_'.join(sample_ids)
 
-# anotions = ['SE', 'A3SS', 'A5SS', 'MXE', 'RI']
-anotions = ['SE', 'A3SS', 'A5SS', 'MXE']
+anotions = ['SE', 'A3SS', 'A5SS', 'MXE', 'RI']
+# anotions = ['SE', 'A3SS', 'A5SS', 'MXE']
 
 modify_bam_index_para = []
 for sample_id in sample_ids:
     one = []
-    one.append('%s_bam/accepted_hits.bam' % sample_id)
-    one.append('%s_bam/accepted_hits_modify.bam' % sample_id)
+    one.append('%s_map/accepted_hits.bam' % sample_id)
+    one.append('%s_map/accepted_hits_modify.bam' % sample_id)
     modify_bam_index_para.append(one)
 
 @files(modify_bam_index_para)
 def modify_bam(infile, outfile):
-    run_cmd('biomi modifybam %s %s' % (infile, outfile))
+    run_cmd('modify_bam %s %s' % (infile, outfile))
 
 @transform(modify_bam, suffix('.bam'), '.bam.bai')
 def index_bam(infile, outfile):
@@ -101,7 +97,7 @@ run_events_analysis_para = []
 for sample_id in sample_ids:
     for anotion in anotions:
         one = []
-        one.append('%s_bam/accepted_hits_modify.bam' % sample_id)
+        one.append('%s_map/accepted_hits_modify.bam' % sample_id)
         one.append('%s_miso/complete_flag/flag.%s.%s.compute-genes-psi-complete' % (sample_id, sample_id, anotion))
         one.append(sample_id)
         one.append(anotion)
@@ -219,16 +215,17 @@ def generate_dsg_list_tsv(infile, outfile):
     run_cmd('Rscript /home/sgguo/python/R_bin/generate_dsg_list_tsv.R %s %s %s_miso_comparisons/dsg-result/dsg_list_furtherfiltered.tsv /home/sgguo/database/human/human_event2gene_ref_0.4above.txt' % (infile , outfile , id_all))
 
 
-@follows(run_miso_compare_samples)
-@files('%(id_all)s_miso_comparisons/complete_flag/flag.%(id_all)s.SE.compare_complete' % {'id_all': id_all}, '%s_miso_comparisons/complete_flag/flag.%s.ln_bamfiles_complete' % (id_all, id_all))
+# @follows(run_miso_compare_samples)
+# @files('%(id_all)s_miso_comparisons/complete_flag/flag.%(id_all)s.SE.compare_complete' % {'id_all': id_all}, '%s_miso_comparisons/complete_flag/flag.%s.ln_bamfiles_complete' % (id_all, id_all))
+@merge(run_miso_compare_samples, '%s_miso_comparisons/complete_flag/flag.%s.ln_bamfiles_complete' % (id_all, id_all))
 def ln_bamfiles(infile, outfile):
     bam_dir = path('%s_miso_comparisons/dsg-result/bam' % id_all)
     if not bam_dir.exists():
         bam_dir.makedirs()
     for sample_id in sample_ids:
         para = {'id': sample_id, 'id_all': id_all, 'pwd': str(path('./').abspath())}
-        run_cmd('ln -s %(pwd)s/%(id)s_bam/accepted_hits_modify.bam %(id_all)s_miso_comparisons/dsg-result/bam/%(id)s.bam' % para)
-        run_cmd('ln -s %(pwd)s/%(id)s_bam/accepted_hits_modify.bam.bai %(id_all)s_miso_comparisons/dsg-result/bam/%(id)s.bam.bai' % para)
+        run_cmd('ln -sf %(pwd)s/%(id)s_map/accepted_hits_modify.bam %(id_all)s_miso_comparisons/dsg-result/bam/%(id)s.bam' % para)
+        run_cmd('ln -sf %(pwd)s/%(id)s_map/accepted_hits_modify.bam.bai %(id_all)s_miso_comparisons/dsg-result/bam/%(id)s.bam.bai' % para)
     open(outfile, 'w')
 
 @transform(ln_bamfiles, suffix('.ln_bamfiles_complete'), '.generate_setfile_complete')
@@ -244,8 +241,8 @@ def generate_setfile(infile, outfile):
     config.set('data', 'bam_files', "['%(id_one)s.bam', '%(id_two)s.bam']" % para)
     miso_files = []
     for anotion in anotions:
-        miso_files.append('%s_miao/%s/' % (sample_ids[0], anotion))
-        miso_files.append('%s_miao/%s/' % (sample_ids[1], anotion))
+        miso_files.append('%s_miso/%s/' % (sample_ids[0], anotion))
+        miso_files.append('%s_miso/%s/' % (sample_ids[1], anotion))
     config.set('data', 'miso_files', str(miso_files))
     config.set('plotting', 'coverages', "[%s, %s]" % (sample_map_read_num[sample_ids[0]], sample_map_read_num[sample_ids[1]]))
     colors = eval(config.get('plotting', 'colors'))
